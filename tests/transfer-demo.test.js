@@ -313,3 +313,75 @@ test('all rental periods use readable Spanish month names without changing their
   assert.equal(h.formatMonth('', '2027-01-10'), 'Enero de 2027');
   assert.equal(h.formatMonth('DIC 2026', '2027-01-02'), 'Diciembre de 2026');
 });
+
+function equalRentFixture() {
+  const contract = structuredClone(liveFixture);
+  contract.cartera.forEach(row => Object.assign(row, { valorBase: 2000000, descuento: 0, cargoExtra: 0, valorPagado: 0, saldo: 2000000 }));
+  contract.resumen.saldo = 4000000;
+  const admin = adminFixture(contract);
+  admin.contracts[0].saldo = 4000000;
+  admin.stats = { ...admin.stats, cartera: 4000000, recaudado: 0 };
+  admin.payments = []; admin.pageInfo.payments.total = 0;
+  return { contract, admin };
+}
+
+test('two separate two-million payments remain two paid months in a stale customer cache and four million received in admin', async () => {
+  const fixture = equalRentFixture();
+  const portal = loadWithBackend(new Map(), fixture);
+  await approveAutomatically(portal);
+  const oldCache = structuredClone((await portal.call('lookupAccount', liveFixture.id)).contracts[0]);
+  assert.equal(oldCache.cartera.filter(row => row.saldo === 0).length, 1);
+  const otherTab = loadWithBackend(portal.storage, fixture);
+  const order = await createLiveOrder(otherTab, ['MES-CUALQUIERA-2']);
+  await otherTab.call('submitTransferReceipt', order.reference, order.accessToken, receipt);
+  otherTab.clock.now += 2500;
+  await otherTab.call('refreshTransferOrder', order.reference, order.accessToken);
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const customer = portal.api.prepareTransferSimulation(oldCache);
+    const admin = await otherTab.call('getAdminDashboard', 'admin-token');
+    assert.equal(customer.cartera.filter(row => row.estadoCalculado === 'PAGADO').length, 2);
+    assert.equal(customer.cartera.reduce((sum, row) => sum + row.valorPagado, 0), 4000000);
+    assert.equal(customer.resumen.saldo, 0);
+    assert.equal(admin.stats.recaudado, 4000000);
+    assert.equal(admin.stats.cartera, customer.resumen.saldo);
+    assert.equal(admin.payments.reduce((sum, payment) => sum + payment.valor, 0), 4000000);
+    assert.deepEqual(Array.from(admin.ledger, row => row.saldo), Array.from(customer.cartera, row => row.saldo));
+  }
+  otherTab.api.resetTransferSimulation();
+  assert.equal(portal.api.prepareTransferSimulation(oldCache).resumen.saldo, 4000000);
+});
+
+test('cached customer rows cannot overwrite a newer base balance read by admin', async () => {
+  const h = loadWithBackend();
+  const cached = structuredClone((await h.call('lookupAccount', liveFixture.id)).contracts[0]);
+  h.admin.ledger[0].valorPagado += 100000;
+  await h.call('getAdminDashboard', 'admin-token');
+  const current = h.api.prepareTransferSimulation(cached);
+  assert.equal(current.cartera[0].valorPagado, 350000);
+  assert.equal(current.cartera[0].saldo, 1600000);
+});
+
+test('invalid saved totals and duplicated monthly credits cannot inflate admin receipts or disagree with the customer', async () => {
+  for (const invalid of ['amount', 'duplicate']) {
+    const fixture = equalRentFixture();
+    const h = loadWithBackend(new Map(), fixture);
+    const order = await approveAutomatically(h);
+    const saved = JSON.parse(h.storage.get('vitrinazo-transfer-simulation-v1'));
+    if (invalid === 'amount') saved.transfers[0].amountInCents *= 2;
+    else saved.transfers.push({ ...structuredClone(saved.transfers[0]), reference: 'DUPLICATE-REFERENCE', accessToken: 'DUPLICATE-TOKEN' });
+    h.storage.set('vitrinazo-transfer-simulation-v1', JSON.stringify(saved));
+    const resumed = loadWithBackend(h.storage, fixture);
+    const customer = (await resumed.call('lookupAccount', liveFixture.id)).contracts[0];
+    const admin = await resumed.call('getAdminDashboard', 'admin-token');
+    const paid = customer.cartera.reduce((sum, row) => sum + row.valorPagado, 0);
+    assert.equal(admin.stats.recaudado, paid);
+    assert.equal(admin.stats.cartera, customer.resumen.saldo);
+    assert.equal(admin.payments.reduce((sum, payment) => sum + payment.valor, 0), paid);
+    assert.equal(paid, invalid === 'amount' ? 0 : 2000000);
+    const status = invalid === 'amount'
+      ? await resumed.call('getTransferOrder', order.reference, order.accessToken)
+      : await resumed.call('getTransferOrder', 'DUPLICATE-REFERENCE', 'DUPLICATE-TOKEN');
+    assert.equal(status.success, false);
+    assert.equal(status.status, 'EN_REVISION');
+  }
+});

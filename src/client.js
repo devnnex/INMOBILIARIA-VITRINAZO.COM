@@ -11,7 +11,7 @@ import { openTransferPayment, updateTransferResume, getTransferToRestore } from 
     newLookup: document.getElementById('newLookup'), demoHint: document.getElementById('demoHint')
   };
   const state = { query: '', contracts: [], activeId: '', selected: new Set(), filter: 'all', version: 0, poller: null };
-  const ACCOUNT_CACHE_KEY = 'vitrinazo-last-account-v2-' + (!Backend.isLive ? 'demo' : Backend.isTransferSimulation ? 'simulation' : 'live');
+  const ACCOUNT_CACHE_KEY = 'vitrinazo-last-account-v3-' + (!Backend.isLive ? 'demo' : Backend.isTransferSimulation ? 'simulation' : 'live');
 
   function normalizeAccountQuery(value) { return String(value || '').trim().toUpperCase().replace(/[\s.]/g, ''); }
   function getCachedAccount(query) {
@@ -26,7 +26,7 @@ import { openTransferPayment, updateTransferResume, getTransferToRestore } from 
   }
   function showAccountResult(query, result, shouldScroll) {
     state.query = query;
-    state.contracts = result.contracts;
+    state.contracts = result.contracts.map(contract => Backend.prepareTransferSimulation(contract));
     state.version = result.version || state.version || 0;
     if (!state.contracts.some(function (item) { return item.id === state.activeId; })) state.activeId = state.contracts[0].id;
     state.selected.clear();
@@ -69,7 +69,7 @@ import { openTransferPayment, updateTransferResume, getTransferToRestore } from 
     }
     try {
       const result = cached ? await Backend.call('syncAccount', query, cached.version) : await Backend.call('lookupAccount', query);
-      if (cached && !result.changed) return;
+      if (cached && !result.changed) { refreshSimulatedAccount(); return; }
       if (!result.found) {
         sessionStorage.removeItem(ACCOUNT_CACHE_KEY);
         elements.account.hidden = true;
@@ -234,6 +234,7 @@ import { openTransferPayment, updateTransferResume, getTransferToRestore } from 
           showToast('Tu estado de cuenta se actualizó.');
         } else if (result.version) {
           state.version = result.version;
+          refreshSimulatedAccount();
         }
       } catch (error) { /* el siguiente ciclo reintenta sin interrumpir */ }
       const hasPending = state.contracts.some(function (contract) {
@@ -243,10 +244,27 @@ import { openTransferPayment, updateTransferResume, getTransferToRestore } from 
     }, delay);
   }
 
+  function refreshSimulatedAccount() {
+    if (!state.query || !state.contracts.length || !Backend.isTransferSimulation) return;
+    state.contracts = state.contracts.map(contract => Backend.prepareTransferSimulation(contract));
+    const validIds = new Set(getActiveContract().cartera.filter(item => item.saldo > 0).map(item => item.id));
+    state.selected.forEach(id => { if (!validIds.has(id)) state.selected.delete(id); });
+    renderAccount();
+    cacheAccount(state.query, { found: true, version: state.version, contracts: state.contracts });
+  }
+  window.addEventListener('vitrinazo-transfer-change', refreshSimulatedAccount);
+  window.addEventListener('storage', function (event) {
+    if (event.key !== 'vitrinazo-transfer-simulation-v1') return;
+    try {
+      if (JSON.parse(event.newValue || '{}').version !== JSON.parse(event.oldValue || '{}').version) refreshSimulatedAccount();
+    } catch (error) { refreshSimulatedAccount(); }
+  });
   document.addEventListener('visibilitychange', function () {
+    if (!document.hidden) refreshSimulatedAccount();
     if (state.query) scheduleAccountSync(document.hidden ? 90000 : 150);
   });
-  window.addEventListener('focus', function () { if (state.query) scheduleAccountSync(100); });
+  window.addEventListener('focus', function () { refreshSimulatedAccount(); if (state.query) scheduleAccountSync(100); });
+  window.addEventListener('pageshow', refreshSimulatedAccount);
 
   async function restoreTransferSession() {
     const saved = getTransferToRestore();

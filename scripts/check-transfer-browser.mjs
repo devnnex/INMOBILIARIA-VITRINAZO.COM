@@ -165,6 +165,13 @@ try {
   await evaluate(`(()=>{const doc=document.getElementById('adminSimulationFrame').contentDocument;if(doc.getElementById('adminShell').hidden){doc.getElementById('adminPin').value='1234';doc.getElementById('adminLoginForm').requestSubmit();}})()`);
   await wait(`document.getElementById('adminSimulationFrame').contentDocument.getElementById('adminShell').hidden === false`);
   await wait(`document.getElementById('adminSimulationFrame').contentDocument.getElementById('statGrid').textContent.includes('4.450.000')`);
+  // A second customer window has a warm cache and unchanged server version.
+  // It must still receive the next local payment and show the same paid months.
+  await evaluate(`(()=>{const frame=document.createElement('iframe');frame.id='customerObserverFrame';frame.src='/index.html';frame.hidden=true;document.body.appendChild(frame);})()`);
+  await wait(`document.getElementById('customerObserverFrame')?.contentDocument?.getElementById('lookupForm') && document.getElementById('customerObserverFrame').contentDocument.readyState === 'complete'`);
+  await evaluate(`(()=>{const doc=document.getElementById('customerObserverFrame').contentDocument;doc.getElementById('lookupInput').value='123456789';doc.getElementById('lookupForm').requestSubmit();})()`);
+  await wait(`document.getElementById('customerObserverFrame').contentDocument.querySelectorAll('#ledgerList .is-paid').length === 2`);
+  await evaluate(`window.__oldCustomerCache=sessionStorage.getItem('vitrinazo-last-account-v3-simulation')`);
   await click('[data-ledger-check="CAR-DEMO-005"]'); await click('#openPayment');
   await wait(`document.querySelector('.transfer-account-form')?.hidden === false`);
   await click('.transfer-account-form button');
@@ -180,6 +187,12 @@ try {
   await wait(`document.querySelector('.transfer-success')?.hidden === false`);
   await wait(`document.querySelector('[data-ledger-id="CAR-DEMO-005"]')?.classList.contains('is-paid')`);
   await wait(`document.getElementById('adminSimulationFrame').contentDocument.getElementById('statGrid').textContent.includes('2.000.000')`);
+  await wait(`document.getElementById('customerObserverFrame').contentDocument.querySelectorAll('#ledgerList .is-paid').length === 3`);
+  await evaluate(`sessionStorage.setItem('vitrinazo-last-account-v3-simulation',window.__oldCustomerCache);document.getElementById('customerObserverFrame').contentDocument.getElementById('lookupForm').requestSubmit()`);
+  await wait(`document.getElementById('customerObserverFrame').contentWindow.__backendActions.includes('syncAccount')`);
+  assert.equal(await evaluate(`document.getElementById('customerObserverFrame').contentDocument.querySelectorAll('#ledgerList .is-paid').length`), 3);
+  assert.match(await evaluate(`document.getElementById('adminSimulationFrame').contentDocument.getElementById('statGrid').textContent`), /7.315.000/);
+  assert.equal(await evaluate(`document.getElementById('customerObserverFrame').contentDocument.querySelector('.balance-card strong').textContent.replace(/[^0-9]/g,'')`), '0');
   await cdp('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
   const layout = await evaluate(`(()=>{const dialog=document.querySelector('.transfer-modal');const surface=dialog.querySelector('.modal__surface');return {width:dialog.getBoundingClientRect().width,overflow:surface.scrollWidth>surface.clientWidth};})()`);
   assert.ok(layout.width <= 390); assert.equal(layout.overflow, false);
@@ -206,5 +219,5 @@ try {
   await screenshot('vitrinazo-admin-simulated-payments');
   assert.equal(await evaluate(`window.__backendActions.some(action=> !['adminLogin','getAdminDashboard','getAdminSync','getClientAccountForAdmin'].includes(action))`), false);
   assert.deepEqual(errors, []);
-  console.log('PASS: automatic payment, Spanish months, customer identity, live admin updates, lower balances, scoped paid badges and history, reload recovery, invalid files, mobile layout, zero production payment writes.');
+  console.log('PASS: customer/admin accounting parity, stale-cache recovery, live updates in both customer windows, automatic payment, Spanish months, scoped history, mobile layout, zero production payment writes.');
 } finally { socket.close(); }

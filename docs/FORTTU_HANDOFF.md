@@ -45,6 +45,16 @@ dos veces. Conservar las bases originales de filas, saldos y contadores al
 actualizar la vista y al reiniciar. Los pagos de otro contrato no deben verse
 afectados, aunque coincidan el cliente, el período o un identificador de fila.
 
+Portal y admin deben usar `activeSimulationOrders` y `simulationLedgerView`
+como cálculo común. El total de cada abono debe coincidir con la suma de sus
+asignaciones; una obligación no puede acreditarse dos veces. La consulta del
+cliente se actualiza también con eventos del almacenamiento compartido, al
+volver a la pestaña y al reutilizar caché, aunque `syncAccount` informe que la
+versión del servidor no cambió. Una vista antigua nunca debe reemplazar una
+base de cartera más reciente. Caso de regresión: dos pagos distintos de
+$2.000.000 deben producir $4.000.000 recibidos y los dos meses pagados del mismo
+contrato, tanto en admin como en una consulta que estaba abierta antes.
+
 ## Conexión real pendiente
 
 No se dispone todavía de documentación, credenciales ni contrato oficial de

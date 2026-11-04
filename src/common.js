@@ -254,7 +254,9 @@
     getTransferOrder: function (reference, accessToken) {
       const order = database.transfers.find(order => order.reference === reference && order.accessToken === accessToken);
       if (!order) throw new Error('No fue posible acceder a esta solicitud.');
-      return structuredClone(order);
+      const result = structuredClone(order);
+      if (result.status === 'APROBADO' && !activeSimulationOrders(database).some(item => item.reference === result.reference)) { result.status = 'EN_REVISION'; result.success = false; }
+      return result;
     },
     refreshTransferOrder: function (reference, accessToken) {
       const order = this.getTransferOrder(reference, accessToken);
@@ -280,7 +282,8 @@
       if (current.status !== 'PENDIENTE_VERIFICACION') return current;
       const order = database.transfers.find(item => item.reference === reference);
       if (!['APPROVED', 'WRONG_AMOUNT', 'REJECTED', 'PENDING'].includes(outcome)) throw new Error('Resultado de prueba inválido.');
-      if (outcome === 'APPROVED') {
+      if (outcome === 'APPROVED' && !validSimulationAllocation(order)) order.status = 'EN_REVISION';
+      else if (outcome === 'APPROVED') {
         const rows = order.months.map(month => database.ledger.find(row => row.id === month.id && row.contratoId === order.contractId));
         if (rows.some((row, index) => !row || Math.round(enrich(row).saldo * 100) !== order.months[index].amountInCents)) order.status = 'EN_REVISION';
         else {
@@ -373,11 +376,14 @@
   // La consulta sigue utilizando el backend existente. Los abonos de prueba se
   // proyectan únicamente sobre la vista local, sin escribir en la cartera real.
   function captureSimulationContract(contract) {
+    return clientSimulationContract(contract, true);
+  }
+  function clientSimulationContract(contract, capture) {
     if (!contract || !Array.isArray(contract.cartera)) return contract;
     reloadSimulation();
     const index = simulationDb.contracts.findIndex(item => item.id === contract.id);
     const previous = simulationDb.contracts[index] || {};
-    const snapshot = { ...previous, id: contract.id, estado: contract.estado || 'ACTIVO', customer: {
+    const snapshot = { ...previous, id: contract.id, estado: contract.estado || 'ACTIVO', ledgerSnapshotComplete: capture || previous.ledgerSnapshotComplete || false, customer: {
       ...previous.customer, id: contract.clienteId || contract.cliente?.id || previous.customer?.id || '',
       name: contract.cliente?.nombre || previous.customer?.name || '',
       document: contract.cliente?.documento || previous.customer?.document || ''
@@ -385,31 +391,34 @@
     if (index === -1) simulationDb.contracts.push(snapshot);
     else simulationDb.contracts[index] = snapshot;
     const rows = contract.cartera.map(item => ({ ...item, contratoId: contract.id }));
-    simulationDb.transfers.filter(order => order.contractId === contract.id && order.status === 'APROBADO').forEach(function (order) {
-      order.months.forEach(function (month) {
-        const row = rows.find(item => item.id === month.id);
-        if (row && Math.round(Number(row.valorPagado || 0) * 100) === month.beforePaidCents && Math.round(enrich(row).saldo * 100) === month.amountInCents) {
-          row.valorPagado = (month.beforePaidCents + month.amountInCents) / 100;
-          row.estado = 'PAGADO'; row.pagoId = 'PAG-' + order.reference;
-        }
-      });
-    });
-    simulationDb.ledger = simulationDb.ledger.filter(item => item.contratoId !== contract.id).concat(rows);
-    persistSimulation();
-    const ledger = rows.map(enrich);
+    if (capture) simulationDb.ledger = simulationDb.ledger.filter(item => item.contratoId !== contract.id);
+    const incoming = capture ? rows : previous.ledgerSnapshotComplete ? [] : rows.filter(row => !simulationDb.ledger.some(item => item.id === row.id && item.contratoId === contract.id));
+    rememberAdminLedger(incoming);
+    const orders = activeSimulationOrders();
+    const ledger = simulationDb.ledger.filter(row => row.contratoId === contract.id)
+      .map(row => simulationLedgerView(row, orders))
+      .sort((a, b) => String(a.fechaVencimiento).localeCompare(String(b.fechaVencimiento)));
     return { ...contract, cartera: ledger, resumen: { ...contract.resumen,
       saldo: ledger.reduce((sum, row) => sum + row.saldo, 0),
       vencidos: ledger.filter(row => row.estadoCalculado === 'VENCIDO').length,
       pendientes: ledger.filter(row => row.saldo > 0).length
     } };
   }
-  function originalSimulationRow(row) {
+  function validSimulationAllocation(order) {
+    return typeof order.contractId === 'string' && order.contractId.length > 0 && order.currency === 'COP' &&
+      Number.isSafeInteger(order.amountInCents) && order.amountInCents > 0 && Array.isArray(order.months) && order.months.length > 0 &&
+      new Set(order.months.map(month => month.id)).size === order.months.length &&
+      order.months.every(month => typeof month.id === 'string' && month.id.length > 0 &&
+        Number.isSafeInteger(month.amountInCents) && month.amountInCents > 0 && Number.isSafeInteger(month.beforePaidCents) && month.beforePaidCents >= 0 && Number.isSafeInteger(month.beforePaidCents + month.amountInCents)) &&
+      order.months.reduce((sum, month) => sum + month.amountInCents, 0) === order.amountInCents;
+  }
+  function originalSimulationRow(row, database = simulationDb) {
     const base = { ...row, ...row.__simulationBase };
     delete base.__simulationBase;
     delete base.__simulation;
     // Compatibilidad con pruebas guardadas antes de compartirlas con admin.
     if (!row.__simulationBase) {
-      const order = simulationDb.transfers.find(item => item.status === 'APROBADO' && item.contractId === row.contratoId && 'PAG-' + item.reference === row.pagoId);
+      const order = database.transfers.find(item => item.status === 'APROBADO' && item.contractId === row.contratoId && 'PAG-' + item.reference === row.pagoId);
       const month = order?.months.find(item => item.id === row.id);
       if (month && Math.round(Number(row.valorPagado || 0) * 100) === month.beforePaidCents + month.amountInCents) {
         base.valorPagado = month.beforePaidCents / 100; base.pagoId = ''; base.estado = 'PENDIENTE';
@@ -417,13 +426,20 @@
     }
     return enrich(base);
   }
-  function activeSimulationOrders() {
-    return simulationDb.transfers.filter(order => order.status === 'APROBADO' && order.success === true && order.months.every(function (month) {
-      const saved = simulationDb.ledger.find(row => row.id === month.id && row.contratoId === order.contractId);
-      if (!saved) return false;
-      const row = originalSimulationRow(saved);
-      return Math.round(Number(row.valorPagado || 0) * 100) === month.beforePaidCents && Math.round(row.saldo * 100) === month.amountInCents;
-    }));
+  function activeSimulationOrders(database = simulationDb) {
+    const used = new Set();
+    return database.transfers.filter(function (order) {
+      if (order.status !== 'APROBADO' || order.success !== true || !validSimulationAllocation(order)) return false;
+      if (order.months.some(month => used.has(JSON.stringify([order.contractId, month.id])))) return false;
+      const valid = order.months.every(function (month) {
+        const saved = database.ledger.find(row => row.id === month.id && row.contratoId === order.contractId);
+        if (!saved) return false;
+        const row = originalSimulationRow(saved, database);
+        return Math.round(Number(row.valorPagado || 0) * 100) === month.beforePaidCents && Math.round(row.saldo * 100) === month.amountInCents;
+      });
+      if (valid) order.months.forEach(month => used.add(JSON.stringify([order.contractId, month.id])));
+      return valid;
+    });
   }
   function simulationLedgerView(row, orders) {
     const base = originalSimulationRow(row);
@@ -524,7 +540,7 @@
     isLive: !DEMO_MODE,
     isTransferSimulation: DEMO_MODE || TRANSFER_SIMULATION_ENABLED,
     prepareTransferSimulation: function (contract) {
-      return !DEMO_MODE && TRANSFER_SIMULATION_ENABLED ? captureSimulationContract(contract) : contract;
+      return !DEMO_MODE && TRANSFER_SIMULATION_ENABLED ? clientSimulationContract(contract, false) : contract;
     },
     projectAdminSimulation: function (data) { return !DEMO_MODE && TRANSFER_SIMULATION_ENABLED ? projectAdminSimulation(data) : data; },
     resetTransferSimulation: function () {
