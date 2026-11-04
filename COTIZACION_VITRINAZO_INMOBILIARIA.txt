@@ -1,0 +1,271 @@
+COTIZACIÓN Y PROPUESTA DE DESARROLLO DE SOFTWARE
+SISTEMA DE GESTIÓN PARA VITRINAZO INMOBILIARIA
+
+Cotización No.: DVX-VTZ-001
+Fecha: 1 de octubre de 2026
+Ciudad: Barrancabermeja, Santander
+
+PROPONENTE
+
+Devnex – Soluciones Tecnológicas
+Representante: Elkin Rangel Vega
+C.C. 1.005.187.130
+Teléfono: 324 639 4689
+Dirección: Calle 39 # 29-159, barrio Las Brisas
+
+CLIENTE
+
+Señor: Junior Omar Darío
+Empresa: Vitrinazo Inmobiliaria
+
+
+1. PRESENTACIÓN DE LA PROPUESTA
+
+Devnex presenta esta cotización para el desarrollo, configuración, entrega y puesta en funcionamiento de una herramienta digital creada especialmente para Vitrinazo Inmobiliaria.
+
+El propósito del sistema es ayudar a organizar en un solo lugar la información de los clientes, las viviendas, los contratos de arrendamiento, los cobros mensuales, los pagos recibidos y los valores pendientes. De esta manera, la inmobiliaria podrá consultar con mayor rapidez qué está ocurriendo con cada contrato y disminuir el trabajo manual, los cálculos repetitivos y el riesgo de perder información importante.
+
+Aunque al conversar sobre el proyecto algunas funciones pueden parecer sencillas —por ejemplo, registrar un cliente, crear un contrato o mostrar cuánto debe pagar—, para que todo funcione correctamente se deben conectar varias reglas entre sí. El sistema necesita entender fechas, calcular meses de contrato, crear cobros mensuales, relacionar cada vivienda con su arrendatario, descontar pagos, conservar historiales, proteger el acceso administrativo y mostrar información clara tanto al administrador como al cliente. Esa coordinación interna es la que convierte el proyecto en una solución de software y no solamente en una página informativa.
+
+
+2. OBJETIVO GENERAL
+
+Desarrollar una herramienta de gestión que permita a Vitrinazo Inmobiliaria llevar un control ordenado, confiable y fácil de consultar sobre su operación de arrendamientos, mejorando la atención al cliente y facilitando el seguimiento de la cartera.
+
+
+3. ¿QUÉ RECIBIRÁ VITRINAZO INMOBILIARIA?
+
+El proyecto contempla una solución funcional compuesta por dos espacios principales:
+
+A. Portal para clientes
+
+El cliente podrá consultar la información de su cuenta mediante sus datos autorizados. Allí podrá visualizar, según corresponda:
+
+- Su contrato de arrendamiento.
+- La vivienda relacionada con el contrato.
+- Los meses cobrados durante la vigencia del contrato.
+- El valor correspondiente a cada mes.
+- Los pagos registrados.
+- Los valores pendientes por pagar.
+- Las fechas límite de pago.
+- El estado de cada obligación: pendiente, vencida o pagada.
+- Las opciones de pago que hayan sido configuradas para la inmobiliaria.
+
+B. Panel administrativo
+
+El personal autorizado de la inmobiliaria podrá administrar y consultar:
+
+- Clientes: documento, nombre, correo, teléfono y estado.
+- Viviendas: código, dirección, ciudad, barrio, tipo, canon mensual y disponibilidad.
+- Contratos: cliente, vivienda, fechas de inicio y finalización, canon mensual, depósito y estado.
+- Cartera: cobros mensuales, vencimientos, descuentos, cargos adicionales, pagos y saldos.
+- Pagos: valores recibidos, fechas, métodos, referencias y observaciones.
+- Resúmenes generales para conocer clientes registrados, contratos activos, cartera pendiente y dinero recaudado.
+- Herramientas de búsqueda para encontrar la información con rapidez.
+
+
+4. FUNCIONAMIENTO INTELIGENTE DE LOS CONTRATOS
+
+El sistema no se limita a guardar textos. También aplica reglas de negocio para que la información sea coherente.
+
+Por ejemplo, al crear un contrato, la herramienta debe revisar las fechas pactadas y generar únicamente los meses que correspondan a esa duración. Si el canon mensual es de $2.000.000 y el contrato cubre doce meses, la base esperada será de doce cobros mensuales, es decir, $24.000.000 antes de descuentos, recargos o pagos. Si el contrato tiene una duración diferente, la cantidad de cobros y el valor total se ajustarán dinámicamente a esas fechas.
+
+De igual manera, si una vivienda ya tiene registrado un canon mensual, ese valor podrá utilizarse al crear su contrato. Si todavía no lo tiene, se podrá acordar manualmente en el contrato y la vivienda conservará ese canon como referencia para usos posteriores.
+
+Estas validaciones ayudan a prevenir cobros duplicados, errores en la cantidad de meses, saldos incorrectos y diferencias entre el valor de la vivienda, el contrato y la cartera.
+
+
+5. RECORDATORIOS POR CORREO ELECTRÓNICO
+
+Como mejora incorporada al proyecto, se configurará el envío de recordatorios por correo electrónico el día 5 de cada mes.
+
+El objetivo del mensaje será recordar de manera amable al cliente que consulte su cuenta y atienda oportunamente el pago del arriendo. El correo podrá incluir una invitación a revisar el valor del mes, su fecha de vencimiento y el medio de pago disponible.
+
+Esta función dependerá de que la inmobiliaria registre correctamente el correo de cada cliente y mantenga esa información actualizada. También estará sujeta a los límites y condiciones del servicio utilizado para enviar los mensajes. No se puede garantizar que todos los correos sean abiertos o que nunca lleguen a la carpeta de mensajes no deseados, porque eso depende del proveedor de correo de cada destinatario.
+
+
+6. ACCESO AL SISTEMA Y ENLACE PERMANENTE
+
+La inmobiliaria recibirá un enlace estable de acceso al sistema, disponible por Internet para ingresar desde un computador, tableta o teléfono con conexión.
+
+Este enlace será permanente para el uso normal de la solución, pero tendrá una dirección técnica asignada al proyecto. Por esa razón, no se verá exactamente como “www.inmobiliariavitrinazo.com”. Esto no impide utilizar el sistema ni afecta sus funciones; simplemente significa que el acceso se realizará mediante el enlace entregado por Devnex.
+
+Si Vitrinazo Inmobiliaria desea posteriormente una dirección propia, corta y comercial, como “www.inmobiliariavitrinazo.com”, será necesario verificar que el nombre esté disponible, comprar el dominio y configurarlo. La compra y renovación del dominio constituyen un servicio externo y no están incluidas en el valor de esta cotización, salvo que las partes lo acuerden expresamente por escrito.
+
+
+7. ¿POR QUÉ NO ES UN SIMPLE SITIO WEB?
+
+Un sitio web sencillo normalmente muestra información fija, como fotografías, teléfonos y una descripción del negocio. Esta propuesta incluye una herramienta que recibe, relaciona, calcula, actualiza y consulta información operativa.
+
+Para que el sistema funcione de manera segura y útil se requiere, entre otros aspectos:
+
+- Diseñar la forma en que se almacenan y relacionan los datos.
+- Programar las reglas de clientes, viviendas, contratos, cartera y pagos.
+- Calcular correctamente meses, vencimientos, valores pagados y saldos.
+- Crear un acceso administrativo protegido.
+- Evitar acciones no autorizadas o registros incoherentes.
+- Preparar la consulta de los clientes sin exponer información privada innecesaria.
+- Adaptar la interfaz para diferentes tamaños de pantalla.
+- Probar escenarios normales y casos especiales antes de la entrega.
+- Corregir errores y acompañar la puesta en marcha.
+
+En palabras sencillas: no se está cobrando solamente por “hacer pantallas”. El valor corresponde a construir la lógica que trabaja detrás de esas pantallas, conectar todas las partes, comprobar que los cálculos sean consistentes y entregar una herramienta que pueda utilizarse en la operación diaria de la inmobiliaria.
+
+
+8. ALCANCE FUNCIONAL INCLUIDO
+
+La inversión presentada incluye:
+
+- Registro, consulta, edición y control de clientes.
+- Registro, consulta, edición y control de viviendas.
+- Creación y administración de contratos de arrendamiento.
+- Asociación entre cliente, vivienda y contrato.
+- Manejo del canon mensual y el depósito.
+- Generación dinámica de cobros mensuales según las fechas del contrato.
+- Control de cartera pendiente, vencida y pagada.
+- Registro de pagos manuales y consulta de movimientos.
+- Aplicación de descuentos y cargos adicionales cuando corresponda.
+- Consulta de cuenta para el cliente.
+- Panel administrativo con indicadores generales.
+- Recordatorios por correo electrónico el día 5 de cada mes.
+- Enlace estable de acceso al sistema.
+- Adaptación básica para computadores, tabletas y teléfonos.
+- Pruebas, correcciones y puesta en funcionamiento de las funciones acordadas.
+- Capacitación o explicación inicial de uso al responsable designado por la inmobiliaria.
+- Soporte durante un año bajo las condiciones indicadas en esta propuesta.
+
+
+9. SERVICIOS DE PAGO Y TERCEROS
+
+Cuando se utilicen servicios externos para procesar pagos electrónicos, enviar correos o adquirir un dominio, dichos proveedores pueden solicitar cuentas, validaciones, credenciales y aplicar tarifas o comisiones propias.
+
+Devnex realizará la configuración técnica que haya sido incluida y acordada para el proyecto. Sin embargo, las comisiones por transacción, costos de cuentas comerciales, compra de dominio, renovaciones y demás cobros de terceros no forman parte de los $6.000.000 de esta cotización, a menos que se establezca lo contrario por escrito.
+
+
+10. METODOLOGÍA DE TRABAJO
+
+El proyecto se desarrollará de forma organizada mediante las siguientes etapas:
+
+1. Reunión de definición: se revisarán con el señor Omar las necesidades, prioridades y reglas del negocio.
+2. Confirmación de alcance: se dejará por escrito qué funciones harán parte de la entrega.
+3. Desarrollo y configuración: se prepararán los módulos, cálculos y conexiones del sistema.
+4. Pruebas: se comprobarán contratos, fechas, cobros, pagos, saldos, accesos y visualización.
+5. Revisión con el cliente: Vitrinazo Inmobiliaria podrá validar el funcionamiento acordado.
+6. Ajustes de entrega: se corregirán los hallazgos relacionados con el alcance aprobado.
+7. Puesta en funcionamiento y entrega final.
+
+El cronograma definitivo se acordará después de confirmar el alcance completo y recibir la información necesaria de la inmobiliaria. Si durante el desarrollo se solicitan funciones nuevas que cambien de manera importante el trabajo inicialmente pactado, se revisarán también el plazo y el valor antes de realizarlas.
+
+
+11. ENTREGABLES
+
+Al finalizar el proyecto se entregará:
+
+- El sistema de gestión Vitrinazo Inmobiliaria con las funciones acordadas.
+- El enlace estable para acceder a la herramienta.
+- El acceso administrativo correspondiente.
+- La configuración inicial necesaria para su operación.
+- Una explicación o capacitación básica de uso.
+- El inicio del periodo de soporte de un año.
+
+
+12. SOPORTE INCLUIDO DURANTE UN AÑO
+
+Devnex incluirá un año de soporte contado desde la fecha de entrega final y aceptación del sistema.
+
+Durante ese periodo se atenderán:
+
+- Dudas sobre el uso de las funciones entregadas.
+- Revisión de comportamientos inesperados reportados por el cliente.
+- Corrección de errores comprobables en las funciones incluidas en el alcance acordado.
+- Orientación básica sobre la operación del sistema.
+- Ajustes menores que no cambien la estructura principal ni agreguen módulos nuevos, previa evaluación de Devnex.
+
+El soporte no incluye desarrollos completamente nuevos, cambios extensos de diseño, integraciones no pactadas, migraciones masivas de información, daños causados por terceros, pérdida de credenciales, alteraciones directas no autorizadas ni costos cobrados por proveedores externos. Cualquier necesidad de ese tipo será revisada y cotizada por separado antes de ejecutarse.
+
+
+13. COBERTURA DESPUÉS DEL PRIMER AÑO
+
+Una vez finalizado el año de soporte incluido, Vitrinazo Inmobiliaria podrá continuar utilizando la versión entregada del sistema.
+
+Si desea conservar acompañamiento técnico, atención de inquietudes, mantenimiento preventivo o actualizaciones menores, podrá adquirir una licencia o plan de cobertura de software. El precio, duración, canales de atención, tiempos de respuesta y cantidad de solicitudes se presentarán según las necesidades que tenga la inmobiliaria en ese momento.
+
+Las funciones nuevas o modificaciones de mayor alcance no se consideran actualizaciones menores y serán cotizadas como desarrollos adicionales.
+
+
+14. INVERSIÓN
+
+Valor total del proyecto: $6.000.000 COP
+
+Forma de pago:
+
+- Primer pago – 50 % para iniciar el proyecto: $3.000.000 COP.
+- Segundo pago – 50 % al finalizar y aprobar la entrega acordada: $3.000.000 COP.
+
+El primer pago confirma la aceptación de la propuesta, reserva el inicio del trabajo y permite comenzar el desarrollo. El segundo pago deberá realizarse al concluir las funciones pactadas, después de la revisión de entrega y antes del cierre definitivo del proyecto.
+
+
+15. JUSTIFICACIÓN DE LA INVERSIÓN
+
+El valor de $6.000.000 COP cubre el análisis, la programación, la organización de datos, el diseño de la experiencia de uso, las validaciones matemáticas y de fechas, las pruebas, la configuración, la puesta en funcionamiento y el acompañamiento posterior.
+
+La herramienta busca producir beneficios prácticos para la inmobiliaria:
+
+- Menos tiempo revisando información en diferentes archivos o conversaciones.
+- Menor riesgo de olvidar cobros o registrar valores de forma incorrecta.
+- Consulta rápida del estado de cada contrato.
+- Mejor seguimiento de pagos y cartera pendiente.
+- Información más clara para atender a los clientes.
+- Historial organizado para apoyar decisiones del negocio.
+- Posibilidad de crecer sobre una base tecnológica ya construida.
+- Un año de soporte incluido, lo cual protege la inversión durante su primera etapa de uso.
+
+Por lo tanto, la inversión no corresponde únicamente a la apariencia del sistema, sino a la creación de una herramienta de trabajo que acompañará procesos importantes de Vitrinazo Inmobiliaria.
+
+
+16. VIGENCIA Y POSIBLES CAMBIOS
+
+Esta cotización tiene una vigencia de quince (15) días calendario a partir de la fecha de emisión.
+
+La propuesta está sujeta a revisión y ajustes de común acuerdo con el señor Omar. Antes de iniciar se recomienda dejar claramente estipuladas las funciones, reglas, responsabilidades y resultados esperados, de manera que la herramienta responda a las necesidades reales de la inmobiliaria o del negocio de arrendamientos.
+
+Los cambios conversados antes de la aprobación definitiva podrán incorporarse a una versión actualizada de esta cotización. Las solicitudes nuevas realizadas después de aprobar el alcance serán evaluadas para determinar si afectan el costo o el tiempo de entrega. Ningún valor adicional deberá aplicarse sin informarlo y acordarlo previamente con el cliente.
+
+
+17. RESPONSABILIDADES DEL CLIENTE
+
+Para desarrollar y operar correctamente el sistema, Vitrinazo Inmobiliaria deberá:
+
+- Entregar información verdadera y completa sobre sus procesos.
+- Definir quién será la persona autorizada para aprobar decisiones y entregas.
+- Proporcionar los datos, textos, cuentas y credenciales externas que sean necesarios.
+- Revisar las entregas dentro de los tiempos acordados.
+- Proteger los accesos administrativos y reportar cualquier uso no autorizado.
+- Mantener actualizados los datos de sus clientes, especialmente los correos electrónicos.
+- Utilizar la información personal conforme a las obligaciones legales que correspondan al negocio.
+
+
+18. ACEPTACIÓN DE LA PROPUESTA
+
+La firma de este documento o la confirmación escrita de aceptación, acompañada del pago inicial del 50 %, permitirá dar inicio al proyecto bajo el alcance acordado por ambas partes.
+
+
+POR DEVNEX
+
+Nombre: Elkin Rangel Vega
+Cargo: Representante de Devnex – Soluciones Tecnológicas
+C.C.: 1.005.187.130
+Firma: ______________________________________
+Fecha: ______________________________________
+
+
+POR VITRINAZO INMOBILIARIA
+
+Nombre: Junior Omar Darío
+Cargo: ______________________________________
+Documento: __________________________________
+Firma: ______________________________________
+Fecha: ______________________________________
+
+
+Nota final: Esta propuesta busca servir como base para conversar y dejar por escrito lo que se desarrollará. Su contenido podrá ajustarse junto con el señor Omar hasta que ambas partes estén de acuerdo con las necesidades, el alcance y las condiciones definitivas del proyecto.

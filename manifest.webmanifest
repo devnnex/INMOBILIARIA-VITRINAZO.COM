@@ -1,0 +1,19 @@
+{
+  "name": "Vitrinazo · Portal inmobiliario",
+  "short_name": "Vitrinazo",
+  "description": "Consulta y paga tu arriendo de forma clara y segura.",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#f5f9fc",
+  "theme_color": "#0a273b",
+  "lang": "es-CO",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "./assets/logo-vitrinazo.png",
+      "sizes": "256x256",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

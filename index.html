@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0a273b">
+  <meta name="color-scheme" content="light">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Vitrinazo">
+  <meta name="description" content="Consulta tu contrato, selecciona tus meses y paga tu arriendo en línea.">
+  <title>Vitrinazo · Tu hogar, en orden</title>
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" type="image/png" href="./assets/logo-vitrinazo.png">
+  <link rel="stylesheet" href="./src/styles.css">
+</head>
+<body class="client-app">
+  <a class="skip-link" href="#consultar">Ir a consultar contrato</a>
+
+  <header class="site-header" id="siteHeader">
+    <a class="brand brand--light" href="#inicio" aria-label="Vitrinazo, inicio">
+      <img src="./assets/logo-vitrinazo.png" alt="" width="42" height="42">
+      <span class="brand__name">VITRINAZO</span>
+      <span class="brand__tag">INMOBILIARIA</span>
+    </a>
+    <nav class="site-nav" aria-label="Navegación principal">
+      <a href="#experiencia">La inmobiliaria</a>
+      <a href="#proceso">Cómo pagar</a>
+      <a href="#contacto">Contacto</a>
+    </nav>
+    <a class="button button--light button--compact" href="#consultar">Consultar y pagar</a>
+  </header>
+
+  <main>
+    <section class="hero" id="inicio" aria-labelledby="heroTitle">
+      <div class="hero__media" id="heroMedia" aria-hidden="true"><img src="./assets/hero-vitrinazo.jpg" alt=""></div>
+      <div class="hero__veil" aria-hidden="true"></div>
+      <div class="hero__content">
+        <div class="hero__copy reveal">
+          <p class="eyebrow eyebrow--light"><span></span> Administración inmobiliaria, hecha simple</p>
+          <h1 id="heroTitle">Tu hogar en orden.<br><em>Tu tranquilidad también.</em></h1>
+          <p class="hero__lead">Consulta tu contrato, revisa cada concepto y paga uno o varios meses desde un solo lugar.</p>
+          <div class="hero__trust">
+            <span class="trust-dot"></span>
+            <span>Transferencia bancaria con comprobante</span>
+          </div>
+        </div>
+
+        <form class="lookup-card reveal reveal--delay" id="lookupForm" novalidate>
+          <div class="lookup-card__top">
+            <span class="lookup-card__icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-5v-6h-4v6H5a1 1 0 0 1-1-1v-9.5Z"/></svg>
+            </span>
+            <div>
+              <p class="kicker">Portal de clientes</p>
+              <h2>Consulta tu cuenta</h2>
+            </div>
+          </div>
+          <label for="lookupInput">Cédula o ID del contrato</label>
+          <div class="field-with-action">
+            <input id="lookupInput" name="query" type="text" inputmode="text" autocomplete="off" placeholder="Ej. 1020304050" minlength="4" required>
+            <button type="button" class="input-clear" id="clearLookup" aria-label="Limpiar búsqueda" hidden>×</button>
+          </div>
+          <p class="field-hint">También puedes usar el código de la vivienda.</p>
+          <button class="button button--primary button--full" type="submit">
+            <span>Consultar estado</span>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+          </button>
+          <div class="lookup-card__secure">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10V8a5 5 0 0 1 10 0v2m-9 0h8a2 2 0 0 1 2 2v7H6v-7a2 2 0 0 1 2-2Z"/></svg>
+            <span>Consulta tus meses pendientes y el estado de tus pagos.</span>
+          </div>
+          <div class="demo-hint" id="demoHint" hidden><strong>SIMULACIÓN · No se realizan pagos reales.</strong><p>Prueba con <button type="button" data-demo-query="1020304050">1020304050</button> o <button type="button" data-demo-query="CV-2026-0042">CV-2026-0042</button>. Selecciona meses, confirma la cuenta y sube un comprobante de prueba. Después podrás simular la respuesta de Forttu.</p><button type="button" id="resetDemo">Reiniciar simulación</button></div>
+        </form>
+      </div>
+      <a class="hero__scroll" href="#experiencia" aria-label="Conocer más">
+        <span>Descubre</span><i></i>
+      </a>
+    </section>
+
+    <section class="account-section" id="consultar" hidden aria-live="polite">
+      <div class="shell shell--wide">
+        <div class="section-heading section-heading--split">
+          <div>
+            <p class="eyebrow"><span></span> Estado de cuenta</p>
+            <h2 id="accountGreeting">Hola</h2>
+            <p id="accountUpdated">Información actualizada ahora</p>
+          </div>
+          <button class="button button--ghost" id="newLookup" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m21 21-4.3-4.3M19 11a8 8 0 1 1-16 0 8 8 0 0 1 16 0Z"/></svg>
+            Nueva consulta
+          </button>
+        </div>
+
+        <div class="contract-tabs" id="contractTabs" role="tablist" aria-label="Contratos encontrados"></div>
+        <button class="button button--soft transfer-resume" id="resumeTransfer" type="button" hidden>Revisar mi transferencia</button>
+
+        <div class="account-grid">
+          <aside class="property-card" id="propertyCard"></aside>
+          <section class="ledger-panel" aria-labelledby="ledgerTitle">
+            <div class="ledger-panel__head">
+              <div>
+                <p class="kicker">Detalle por mes</p>
+                <h3 id="ledgerTitle">Selecciona qué deseas pagar</h3>
+              </div>
+              <div class="filter-chips" id="ledgerFilters" aria-label="Filtrar meses de pago">
+                <button class="chip is-active" type="button" data-filter="all">Todos</button>
+                <button class="chip" type="button" data-filter="pending">Pendientes</button>
+                <button class="chip" type="button" data-filter="paid">Pagados</button>
+              </div>
+            </div>
+            <div class="select-all-row">
+              <label class="check-label"><input type="checkbox" id="selectAllMonths"><span></span> Seleccionar todo lo pendiente</label>
+              <span id="selectedCount">0 seleccionados</span>
+            </div>
+            <div class="ledger-list" id="ledgerList"></div>
+          </section>
+        </div>
+      </div>
+
+      <div class="payment-bar" id="paymentBar" aria-live="polite">
+        <div>
+          <span>Total seleccionado</span>
+          <strong id="selectedTotal">$0</strong>
+        </div>
+        <button class="button button--primary" id="openPayment" type="button" disabled>
+          Continuar al pago
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+        </button>
+      </div>
+    </section>
+
+    <section class="experience" id="experiencia">
+      <div class="shell experience__grid">
+        <div class="experience__statement reveal">
+          <p class="eyebrow"><span></span> Vitrinazo Inmobiliaria</p>
+          <h2>Administramos espacios.<br><em>Cuidamos historias.</em></h2>
+        </div>
+        <div class="experience__copy reveal reveal--delay">
+          <p>Convertimos la administración de tu vivienda en una experiencia clara, humana y sin vueltas.</p>
+          <a href="#consultar" class="text-link">Ir a mi estado de cuenta <span>↗</span></a>
+        </div>
+      </div>
+      <div class="signature-line" aria-hidden="true"><span>V</span></div>
+    </section>
+
+    <section class="process" id="proceso">
+      <div class="shell">
+        <div class="section-heading section-heading--center">
+          <p class="eyebrow"><span></span> Así de fácil</p>
+          <h2>Tres pasos. Cero complicaciones.</h2>
+        </div>
+        <div class="process-grid">
+          <article class="process-card"><span>01</span><div class="process-card__icon"><svg viewBox="0 0 24 24"><path d="m21 21-4.3-4.3M19 11a8 8 0 1 1-16 0 8 8 0 0 1 16 0Z"/></svg></div><h3>Consulta</h3><p>Ingresa tu cédula o contrato y encuentra las viviendas asociadas.</p></article>
+          <article class="process-card process-card--accent"><span>02</span><div class="process-card__icon"><svg viewBox="0 0 24 24"><path d="M5 4h14v16H5zM8 8h8M8 12h8M8 16h5"/></svg></div><h3>Elige</h3><p>Revisa descuentos, cargos y observaciones. Selecciona uno o varios meses.</p></article>
+          <article class="process-card"><span>03</span><div class="process-card__icon"><svg viewBox="0 0 24 24"><path d="M3 7h18v11H3zM3 10h18M7 15h3"/></svg></div><h3>Paga</h3><p>Transfiere desde tu banco, vuelve y sube el comprobante. Recibe aquí la confirmación de tu pago.</p></article>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer" id="contacto">
+    <div class="shell site-footer__grid">
+      <div>
+        <a class="brand brand--light" href="#inicio">
+          <img src="./assets/logo-vitrinazo.png" alt="" width="48" height="48">
+          <span class="brand__name">VITRINAZO</span><span class="brand__tag">INMOBILIARIA</span>
+        </a>
+        <p>Relaciones inmobiliarias más claras,<br>desde el primer día.</p>
+      </div>
+      <div><span>Atención</span><a href="tel:+573000000000">+57 300 000 0000</a><a href="mailto:clientes@vitrinazo.co">clientes@vitrinazo.co</a></div>
+      <div><span>Horario</span><p>Lunes a viernes<br>8:00 a.m. — 5:30 p.m.</p></div>
+      <div><span>Administración</span><a id="adminLink" href="./admin.html">Ingresar al panel ↗</a></div>
+    </div>
+    <div class="shell site-footer__bottom"><span>© 2026 Vitrinazo Inmobiliaria</span><span>Transferencias con verificación de comprobantes</span></div>
+  </footer>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script type="module" src="./src/client.js"></script>
+</body>
+</html>

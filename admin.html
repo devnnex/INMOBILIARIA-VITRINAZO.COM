@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="theme-color" content="#071c2c">
+  <meta name="description" content="Panel administrativo de Vitrinazo Inmobiliaria">
+  <title>Vitrinazo · Administración</title>
+  <link rel="icon" type="image/png" href="./assets/logo-vitrinazo.png">
+  <link rel="stylesheet" href="./src/styles.css">
+</head>
+<body class="admin-app">
+  <section class="admin-login" id="adminLogin">
+    <div class="admin-login__visual" id="adminLoginVisual">
+      <img class="admin-login__background" src="./assets/hero-vitrinazo.jpg" alt="" aria-hidden="true">
+      <a class="brand brand--light" href="./index.html">
+        <img src="./assets/logo-vitrinazo.png" alt="" width="48" height="48">
+        <span class="brand__name">VITRINAZO</span><span class="brand__tag">INMOBILIARIA</span>
+      </a>
+      <div><p class="eyebrow eyebrow--light"><span></span> Administración de viviendas</p><h1>Todo lo que administras.<br><em>En una sola vista.</em></h1></div>
+      <p>Clientes, contratos, cobros pendientes y pagos al día.</p>
+    </div>
+    <form class="admin-login__form" id="adminLoginForm">
+      <p class="kicker">Acceso privado</p>
+      <h2>Bienvenido de nuevo</h2>
+      <p>Ingresa el PIN administrativo configurado en el proyecto.</p>
+      <label for="adminPin">PIN de acceso</label>
+      <div class="password-field"><input id="adminPin" name="pin" type="password" inputmode="numeric" autocomplete="current-password" minlength="4" required placeholder="••••••••"><button type="button" id="togglePin" aria-label="Mostrar PIN">Ver</button></div>
+      <button class="button button--primary button--full" type="submit">Entrar al panel <span>→</span></button>
+      <p class="demo-hint" id="adminDemoHint" hidden>Vista local: usa el PIN <button type="button" data-demo-pin="1234">1234</button>.</p>
+      <a class="back-link" href="./index.html">← Volver al portal de clientes</a>
+    </form>
+  </section>
+
+  <div class="admin-shell" id="adminShell" hidden>
+    <aside class="admin-sidebar">
+      <a class="brand" href="#" aria-label="Vitrinazo administración">
+        <img src="./assets/logo-vitrinazo.png" alt="" width="40" height="40">
+        <span class="brand__name">VITRINAZO</span><span class="brand__tag">ADMIN</span>
+      </a>
+      <nav class="admin-nav" aria-label="Secciones administrativas">
+        <button class="is-active" data-view="dashboard"><svg viewBox="0 0 24 24"><path d="M4 13h6V4H4v9Zm0 7h6v-4H4v4Zm10 0h6v-9h-6v9Zm0-16v4h6V4h-6Z"/></svg><span>Resumen</span></button>
+        <button data-view="clients"><svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm13 10v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"/></svg><span>Clientes</span></button>
+        <button data-view="properties"><svg viewBox="0 0 24 24"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 9h2v2H9zm4 0h2v2h-2zm-4 5h2v2H9zm4 0h2v2h-2z"/></svg><span>Viviendas</span></button>
+        <button data-view="contracts"><svg viewBox="0 0 24 24"><path d="M6 3h9l3 3v15H6zM14 3v4h4M9 12h6M9 16h6M9 8h2"/></svg><span>Contratos</span></button>
+        <button data-view="payments"><svg viewBox="0 0 24 24"><path d="M3 7h18v11H3zM3 10h18M7 15h3"/></svg><span>Pagos</span></button>
+      </nav>
+      <div class="admin-sidebar__foot"><span class="status-dot"></span><div><strong>Sistema activo</strong><small id="syncStatus">Información al día</small></div></div>
+    </aside>
+
+    <main class="admin-main">
+      <header class="admin-topbar">
+        <button class="mobile-menu" id="mobileMenu" aria-label="Abrir menú"><span></span><span></span></button>
+        <div><p id="adminBreadcrumb">Panel / Resumen</p><h1 id="adminTitle">Buenos días</h1></div>
+        <div class="admin-topbar__actions">
+          <button class="icon-button" id="refreshAdmin" aria-label="Actualizar"><svg viewBox="0 0 24 24"><path d="M20 6v5h-5M4 18v-5h5M6.1 9a7 7 0 0 1 11.6-2.6L20 9M4 15l2.3 2.6A7 7 0 0 0 18 15"/></svg></button>
+          <button class="button button--primary button--compact" id="quickCreate" type="button">＋ Nuevo registro</button>
+          <div class="admin-avatar">VI</div>
+        </div>
+      </header>
+
+      <section class="admin-view is-active" data-panel="dashboard">
+        <div class="welcome-card">
+          <div><p class="kicker">Resumen de hoy</p><h2>Todo está al día.</h2><p>Revisa cuánto falta por cobrar y agrega pagos sin salir del panel.</p></div>
+          <div class="welcome-card__date" id="todayCard"></div>
+        </div>
+        <div class="stat-grid" id="statGrid"></div>
+        <div class="dashboard-grid">
+          <section class="panel"><div class="panel__head"><div><p class="kicker">Más recientes</p><h3>Contratos recientes</h3></div><button class="text-button" data-go="contracts">Ver todos →</button></div><div class="table-wrap"><table><thead><tr><th>Contrato</th><th>Cliente</th><th>Vivienda</th><th>Falta por cobrar</th><th>Estado</th></tr></thead><tbody id="recentContracts"></tbody></table></div></section>
+          <section class="panel collection-panel"><div class="panel__head"><div><p class="kicker">Pagos recibidos</p><h3>Dinero recibido y pendiente</h3></div></div><div class="donut-wrap"><div class="donut" id="collectionDonut"><span id="collectionPercent">0%</span></div><div><strong id="collectedValue">$0</strong><span>recibido</span><p id="outstandingValue">$0 por cobrar</p></div></div><button class="button button--soft button--full" data-action="manual-payment">Agregar pago recibido</button></section>
+        </div>
+      </section>
+
+      <section class="admin-view" data-panel="clients"><div class="view-head"><div><p class="kicker">Lista de personas</p><h2>Clientes</h2><p>Busca a una persona y abre su cuenta para revisar o cambiar sus valores mensuales.</p></div><button class="button button--primary" data-action="new-client">＋ Crear cliente</button></div><div class="panel"><div class="table-tools"><label class="search-box"><svg viewBox="0 0 24 24"><path d="m21 21-4.3-4.3M19 11a8 8 0 1 1-16 0 8 8 0 0 1 16 0Z"/></svg><input type="search" data-table-search="clients" placeholder="Buscar nombre, documento, correo o celular"></label><select class="table-filter" data-table-filter="clients" aria-label="Filtrar clientes por estado"><option value="">Todos los estados</option><option value="ACTIVO">Activos</option><option value="INACTIVO">Inactivos</option></select></div><div class="table-wrap"><table><thead><tr><th>Cliente</th><th>Número de documento</th><th>Datos de contacto</th><th>Estado</th><th>Acciones</th></tr></thead><tbody id="clientsTable"></tbody></table></div><div class="table-pagination" data-pagination="clients"><span></span><button class="button button--soft" type="button" data-load-more="clients">Ver 1.000 más</button></div></div></section>
+      <section class="admin-view" data-panel="properties"><div class="view-head"><div><p class="kicker">Lista de viviendas</p><h2>Viviendas</h2><p>Viviendas disponibles o que ya tienen un contrato.</p></div><button class="button button--primary" data-action="new-property">＋ Crear vivienda</button></div><div class="panel"><div class="table-tools"><label class="search-box"><svg viewBox="0 0 24 24"><path d="m21 21-4.3-4.3M19 11a8 8 0 1 1-16 0 8 8 0 0 1 16 0Z"/></svg><input type="search" data-table-search="properties" placeholder="Buscar código, dirección, ciudad, barrio o tipo"></label><select class="table-filter" data-table-filter="properties" aria-label="Filtrar viviendas por estado"><option value="">Todos los estados</option><option value="DISPONIBLE">Disponibles</option><option value="OCUPADA">Ocupadas</option><option value="MANTENIMIENTO">En mantenimiento</option></select></div><div class="table-wrap"><table><thead><tr><th>Código</th><th>Dirección</th><th>Tipo</th><th>Arriendo mensual</th><th>Estado</th><th>Acciones</th></tr></thead><tbody id="propertiesTable"></tbody></table></div><div class="table-pagination" data-pagination="properties"><span></span><button class="button button--soft" type="button" data-load-more="properties">Ver 1.000 más</button></div></div></section>
+      <section class="admin-view" data-panel="contracts"><div class="view-head"><div><p class="kicker">Acuerdos de arriendo</p><h2>Contratos</h2><p>Une cada cliente con una vivienda y define las fechas del arriendo.</p></div><button class="button button--primary" data-action="new-contract">＋ Crear contrato</button></div><div class="panel"><div class="table-tools"><label class="search-box"><svg viewBox="0 0 24 24"><path d="m21 21-4.3-4.3M19 11a8 8 0 1 1-16 0 8 8 0 0 1 16 0Z"/></svg><input type="search" data-table-search="contracts" placeholder="Buscar contrato, cliente o vivienda"></label><select class="table-filter" data-table-filter="contracts" aria-label="Filtrar contratos por estado"><option value="">Todos los estados</option><option value="ACTIVO">Activos</option><option value="FINALIZADO">Finalizados</option><option value="CANCELADO">Cancelados</option></select></div><div class="table-wrap"><table><thead><tr><th>Contrato</th><th>Cliente</th><th>Vivienda</th><th>Fechas del contrato</th><th>Falta por cobrar</th><th>Estado</th><th>Acciones</th></tr></thead><tbody id="contractsTable"></tbody></table></div><div class="table-pagination" data-pagination="contracts"><span></span><button class="button button--soft" type="button" data-load-more="contracts">Ver 1.000 más</button></div></div></section>
+      <section class="admin-view" data-panel="payments"><div class="view-head"><div><p class="kicker">Historial</p><h2>Pagos</h2><p>Transferencias verificadas y pagos agregados por el administrador.</p></div><button class="button button--primary" data-action="manual-payment">＋ Agregar pago</button></div><div class="panel"><div class="table-tools"><label class="search-box"><svg viewBox="0 0 24 24"><path d="m21 21-4.3-4.3M19 11a8 8 0 1 1-16 0 8 8 0 0 1 16 0Z"/></svg><input type="search" data-table-search="payments" placeholder="Buscar pago, contrato, forma o fecha"></label><select class="table-filter" data-table-filter="payments" aria-label="Filtrar pagos por estado"><option value="">Todos los estados</option><option value="APROBADO">Aprobados</option><option value="PENDIENTE">Pendientes</option><option value="RECHAZADO">Rechazados</option><option value="ANULADO">Anulados</option></select></div><div class="table-wrap"><table><thead><tr><th>Número del pago</th><th>Contrato</th><th>Valor</th><th>Forma de pago</th><th>Fecha</th><th>Estado</th><th>Acciones</th></tr></thead><tbody id="paymentsTable"></tbody></table></div><div class="table-pagination" data-pagination="payments"><span></span><button class="button button--soft" type="button" data-load-more="payments">Ver 1.000 más</button></div></div></section>
+    </main>
+
+    <nav class="admin-mobile-nav" aria-label="Navegación móvil">
+      <button class="is-active" data-view="dashboard"><svg viewBox="0 0 24 24"><path d="M4 13h6V4H4v9Zm0 7h6v-4H4v4Zm10 0h6v-9h-6v9Zm0-16v4h6V4h-6Z"/></svg><span>Inicio</span></button>
+      <button data-view="clients"><svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z"/></svg><span>Clientes</span></button>
+      <button data-view="properties"><svg viewBox="0 0 24 24"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 9h2v2H9zm4 0h2v2h-2Z"/></svg><span>Viviendas</span></button>
+      <button data-view="contracts"><svg viewBox="0 0 24 24"><path d="M6 3h9l3 3v15H6zM9 12h6"/></svg><span>Contratos</span></button>
+      <button data-view="payments"><svg viewBox="0 0 24 24"><path d="M3 7h18v11H3zM3 10h18"/></svg><span>Pagos</span></button>
+    </nav>
+  </div>
+
+  <dialog class="modal admin-modal" id="recordDialog"><form class="modal__surface" id="recordForm"><button class="modal__close" type="button" data-dialog-close aria-label="Cerrar">×</button><p class="kicker" id="recordKicker">Nuevo registro</p><h2 id="recordTitle">Crear</h2><div class="form-grid" id="recordFields"></div><div class="modal__actions"><button class="button button--ghost" type="button" data-dialog-close>Cancelar</button><button class="button button--primary" id="recordSubmit" type="submit">Guardar registro</button></div></form></dialog>
+  <dialog class="modal admin-modal" id="adjustDialog"><form class="modal__surface" id="adjustForm"><button class="modal__close" type="button" data-dialog-close aria-label="Cerrar">×</button><p class="kicker">Cambiar el valor del mes</p><h2 id="adjustTitle">Editar mes</h2><input type="hidden" name="id"><div class="form-grid"><label>Descuento<input type="text" name="descuento" inputmode="numeric" autocomplete="off" data-currency-input data-currency-min="0"></label><label>Cobro adicional<input type="text" name="cargoExtra" inputmode="numeric" autocomplete="off" data-currency-input data-currency-min="0"></label><label class="form-span">Nota<textarea name="observacion" rows="3" maxlength="300" placeholder="Explica por qué cambió el valor"></textarea></label></div><div class="modal__actions"><button class="button button--ghost" type="button" data-dialog-close>Cancelar</button><button class="button button--primary" type="submit">Guardar cambio</button></div></form></dialog>
+  <dialog class="modal admin-modal" id="manualPaymentDialog"><form class="modal__surface" id="manualPaymentForm"><button class="modal__close" type="button" data-dialog-close aria-label="Cerrar">×</button><p class="kicker" id="manualPaymentKicker">Pago agregado por el administrador</p><h2 id="manualPaymentTitle">Agregar pago recibido</h2><div class="form-grid"><label class="form-span">Contrato<select name="contratoId" required></select></label><label class="form-span">Meses que faltan por pagar<div class="month-picker" id="manualMonthPicker"><p>Selecciona un contrato para ver los meses que faltan por pagar.</p></div></label><label>Dinero recibido<input type="text" name="valor" inputmode="numeric" autocomplete="off" data-currency-input data-currency-min="1" required></label><label>Forma de pago<select name="metodo" required><option value="EFECTIVO">Efectivo</option><option value="TRANSFERENCIA">Transferencia</option><option value="CONSIGNACION">Depósito bancario</option></select></label><label>Fecha del pago<input type="date" name="fecha" required></label><label>Nota<input type="text" name="nota" maxlength="200" placeholder="Número del comprobante o una explicación"></label></div><div class="modal__actions"><button class="button button--ghost" type="button" data-dialog-close>Cancelar</button><button class="button button--primary" id="manualPaymentSubmit" type="submit">Guardar pago</button></div></form></dialog>
+  <dialog class="modal admin-modal client-account-modal" id="clientAccountDialog"><div class="modal__surface"><button class="modal__close" type="button" data-dialog-close aria-label="Cerrar">×</button><p class="kicker">Cuenta del cliente</p><h2 id="clientAccountTitle">Información del cliente</h2><div class="client-account__identity" id="clientAccountIdentity"></div><div class="client-account__contracts" id="clientAccountContracts"></div><div class="client-account__summary" id="clientAccountSummary"></div><div class="client-account__content"><section><div class="client-account__head"><div><p class="kicker">Meses del arriendo</p><h3>Valores pendientes y pagados</h3></div></div><div class="client-account__months" id="clientAccountMonths"></div></section><section><div class="client-account__head"><div><p class="kicker">Movimientos</p><h3>Pagos registrados</h3></div><button class="button button--soft" type="button" data-action="manual-payment">Agregar pago</button></div><div class="client-account__payments" id="clientAccountPayments"></div></section></div></div></dialog>
+  <dialog class="modal confirm-modal" id="deleteDialog"><form class="modal__surface" id="deleteForm"><button class="modal__close" type="button" data-dialog-close aria-label="Cerrar">×</button><div class="confirm-modal__icon" aria-hidden="true">!</div><p class="kicker">Confirmar eliminación</p><h2 id="deleteTitle">Eliminar registro</h2><p class="modal__intro" id="deleteMessage">Esta acción no se puede deshacer.</p><div class="modal__actions"><button class="button button--ghost" type="button" data-dialog-close>Cancelar</button><button class="button button--danger" type="submit">Sí, eliminar</button></div></form></dialog>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script type="module" src="./src/admin.js"></script>
+</body>
+</html>
