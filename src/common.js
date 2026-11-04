@@ -45,6 +45,8 @@
   function showToast(message, type) {
     const toast = document.getElementById('toast');
     if (!toast) return;
+    const host = document.querySelector('dialog[open] .modal__surface') || document.body;
+    if (host && toast.parentElement !== host) host.appendChild(toast);
     toast.textContent = message;
     toast.className = 'toast is-visible' + (type === 'error' ? ' is-error' : '');
     clearTimeout(showToast.timer);
@@ -72,7 +74,16 @@
     loader.hidden = true;
     loader.setAttribute('role', 'status');
     loader.setAttribute('aria-live', 'polite');
-    loader.innerHTML = '<div class="experience-loader__card"><div class="experience-loader__scene" aria-hidden="true"><span class="experience-loader__orbit experience-loader__orbit--one"></span><span class="experience-loader__orbit experience-loader__orbit--two"></span><img src="./assets/logo-vitrinazo.png" alt=""><i></i></div><p class="kicker">Vitrinazo</p><strong data-loader-title>Preparando tu información</strong><p data-loader-message>Organizando los datos más recientes…</p><div class="experience-loader__progress" aria-hidden="true"><span></span><span></span><span></span></div></div>';
+    // El símbolo está integrado: nunca muestra una imagen rota ni espera la red.
+    loader.innerHTML = '<div class="experience-loader__card"><div class="experience-loader__scene" aria-hidden="true"><span class="experience-loader__orbit experience-loader__orbit--one"></span><span class="experience-loader__orbit experience-loader__orbit--two"></span>' +
+      '<svg class="experience-loader__brand" viewBox="0 0 256 256" width="52" height="52" focusable="false">' +
+      '<path fill="#2db7f4" d="M16 62h51l61 116v56l-48-51Z"/>' +
+      '<path fill="#071c2c" d="m128 178 61-116h51l-64 122-48 50Z"/>' +
+      '<path fill="#36bdf7" d="m73 66 55-36v27L85 83Z"/>' +
+      '<path fill="#12364e" d="m128 30 55 36-11 17-44-26Z"/>' +
+      '<path fill="#29b5f2" d="m96 91 27-18v82Z"/>' +
+      '<path fill="#0d293d" d="m133 73 31 18-31 64Z"/>' +
+      '</svg><i></i></div><p class="kicker">Vitrinazo</p><strong data-loader-title>Preparando tu información</strong><p data-loader-message>Organizando los datos más recientes…</p><div class="experience-loader__progress" aria-hidden="true"><span></span><span></span><span></span></div></div>';
     document.body.appendChild(loader);
     return loader;
   }
@@ -101,7 +112,7 @@
     loader.hidden = false;
     loader.setAttribute('aria-hidden', 'false');
     document.body.classList.add('page-is-loading');
-    requestAnimationFrame(function () { loader.classList.add('is-visible'); });
+    loader.classList.add('is-visible');
     let index = 0;
     loaderMessageTimer = setInterval(function () {
       index = (index + 1) % messages.length;
@@ -601,5 +612,20 @@
   }
 
 applyAssets();
+
+// Keep constraint validation accessible without browser-native popovers.
+if (document.addEventListener) {
+  document.addEventListener('invalid', function (event) {
+    event.preventDefault();
+    const field = event.target;
+    field.setAttribute('aria-invalid', 'true');
+    if (!field.form || field === field.form.querySelector('input:invalid,select:invalid,textarea:invalid')) {
+      const label = field.labels?.[0]?.childNodes[0]?.textContent?.trim() || 'este campo';
+      showToast(field.validity.valueMissing ? 'Completa ' + label.toLowerCase() + '.' : 'Revisa ' + label.toLowerCase() + '.', 'error');
+      field.focus();
+    }
+  }, true);
+  document.addEventListener('input', function (event) { event.target.removeAttribute?.('aria-invalid'); });
+}
 
 export { Backend, formatMoney, formatDate, formatRentalMonth, formatPaymentMethod, escapeHtml, initials, debounce, showToast, setBusy, setPageLoader };

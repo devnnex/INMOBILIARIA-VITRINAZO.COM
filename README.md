@@ -123,3 +123,8 @@ Los triggers instalables de edición y cambio detectan también modificaciones m
 ## PWA
 
 La versión web incluye manifiesto, icono, modo standalone, áreas seguras móviles y controles de 16 px para evitar el zoom automático. El frontend se aloja como sitio estático y Apps Script permanece exclusivamente como API.
+
+El manifiesto y su icono se publican desde `public/` con rutas relativas al sitio,
+compatibles con GitHub Pages. No se almacenan respuestas administrativas en una
+caché offline. El perfil y el cambio de PIN requieren publicar la versión de
+`Code.gs`: ver [instrucciones de cuenta administrativa](docs/ADMIN_ACCOUNT.md).

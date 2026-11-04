@@ -1,4 +1,5 @@
 import { Backend, formatMoney, formatDate, formatRentalMonth, formatPaymentMethod, escapeHtml, initials, debounce, showToast, setBusy, setPageLoader } from './common.js';
+import { setupAdminAccount } from './admin-account.js';
 
 'use strict';
 
@@ -38,6 +39,36 @@ const deleteDialog = document.getElementById('deleteDialog');
 const deleteForm = document.getElementById('deleteForm');
 const clientAccountDialog = document.getElementById('clientAccountDialog');
 const syncStatus = document.getElementById('syncStatus');
+const account = setupAdminAccount({
+  getToken: () => state.token,
+  setToken: token => { state.token = token; sessionStorage.setItem('vitrinazo-admin-token', token); },
+  onLogout: clearAdminSession,
+  onSessionError: error => handleAdminError(error, false)
+});
+
+function clearAdminSession() {
+  state.token = '';
+  sessionStorage.removeItem('vitrinazo-admin-token');
+  clearTimeout(state.syncTimer);
+  state.data = null;
+  state.rendered = {};
+  state.versions = {};
+  state.version = 0;
+  state.pageInfo = {};
+  state.manualLedger = [];
+  state.clientAccountId = '';
+  state.clientAccountContractId = '';
+  state.deleteTarget = null;
+  document.querySelectorAll('dialog[open]').forEach(dialog => dialog.close());
+  account.reset();
+  loginForm.reset();
+  document.getElementById('adminPin').type = 'password';
+  document.getElementById('togglePin').textContent = 'Ver';
+  shell.hidden = true;
+  login.hidden = false;
+  setPageLoader(false);
+  document.getElementById('adminPin').focus();
+}
 
 if (!Backend.isLive) demoHint.hidden = false;
 document.querySelectorAll('[data-demo-pin]').forEach(function (button) {
@@ -61,6 +92,8 @@ loginForm.addEventListener('submit', async function (event) {
     if (!result.ok) throw new Error(result.needsSetup ? 'La inicialización automática aún no terminó. Reintenta en unos segundos o actualiza el despliegue de Apps Script.' : result.message || 'No fue posible ingresar.');
     state.token = result.token;
     sessionStorage.setItem('vitrinazo-admin-token', state.token);
+    account.load(result.admin);
+    loginForm.reset();
     await enterAdmin();
   } catch (error) {
     showToast(error.message, 'error');
@@ -70,12 +103,15 @@ loginForm.addEventListener('submit', async function (event) {
 });
 
 async function enterAdmin() {
+  const token = state.token;
+  account.load();
   setPageLoader(true, {
     title: 'Preparando el panel',
     messages: ['Organizando clientes y viviendas…', 'Actualizando contratos y cobros…', 'Dejando todo listo para trabajar…']
   });
   try {
     await loadDashboard(true);
+    if (state.token !== token) return;
     login.hidden = true;
     shell.hidden = false;
     startSyncLoop();
@@ -85,9 +121,11 @@ async function enterAdmin() {
 }
 
 async function loadDashboard(silent) {
+  const token = state.token;
   setSyncStatus('Cargando información…');
   try {
-    const result = await Backend.call('getAdminDashboard', state.token, PAGE_SIZE);
+    const result = await Backend.call('getAdminDashboard', token, PAGE_SIZE);
+    if (state.token !== token) return;
     state.data = result;
     state.version = result.version || 0;
     state.versions = result.versions || {};
@@ -95,7 +133,7 @@ async function loadDashboard(silent) {
     renderAll();
     setSyncStatus('Información al día');
   } catch (error) {
-    handleAdminError(error, silent);
+    if (state.token === token) handleAdminError(error, silent);
     throw error;
   }
 }
@@ -123,9 +161,11 @@ function nextSyncDelay() {
 async function syncChanges(silent) {
   if (state.syncing || !state.token || !state.data) return false;
   state.syncing = true;
+  const token = state.token;
   setSyncStatus('Comprobando cambios…');
   try {
-    const result = await Backend.call('getAdminSync', state.token, state.versions, PAGE_SIZE);
+    const result = await Backend.call('getAdminSync', token, state.versions, PAGE_SIZE);
+    if (state.token !== token) return false;
     state.version = result.version || state.version;
     state.versions = result.versions || state.versions;
     if (!result.changed) {
@@ -142,7 +182,7 @@ async function syncChanges(silent) {
     if (!silent) showToast('El panel recibió los cambios más recientes.');
     return true;
   } catch (error) {
-    handleAdminError(error, true);
+    if (state.token === token) handleAdminError(error, true);
     setSyncStatus('Se reintentará automáticamente');
     return false;
   } finally {
@@ -215,11 +255,7 @@ async function loadMore(section, button) {
 
 function handleAdminError(error, silent) {
   if (/sesión|session/i.test(error.message || '')) {
-    state.token = '';
-    sessionStorage.removeItem('vitrinazo-admin-token');
-    clearTimeout(state.syncTimer);
-    login.hidden = false;
-    shell.hidden = true;
+    clearAdminSession();
   }
   if (!silent) showToast(error.message || 'No fue posible actualizar.', 'error');
 }
@@ -676,11 +712,11 @@ function switchView(view) {
 document.getElementById('refreshAdmin').addEventListener('click', async function () {
   const button = this;
   button.disabled = true;
-  setPageLoader(true, {
-    title: 'Actualizando el panel',
-    messages: ['Comprobando cambios recientes…', 'Actualizando los cobros…', 'Terminando la actualización…']
-  });
-  try { await loadDashboard(); showToast('Información actualizada.'); } finally { button.disabled = false; setPageLoader(false); }
+  button.classList.add('is-refreshing');
+  button.setAttribute('aria-busy', 'true');
+  try { await loadDashboard(); if (state.token) showToast('Información actualizada.'); }
+  catch (error) { /* loadDashboard already displays the error. */ }
+  finally { button.disabled = false; button.classList.remove('is-refreshing'); button.removeAttribute('aria-busy'); }
 });
 document.getElementById('quickCreate').addEventListener('click', function () { openRecord('client'); });
 document.querySelectorAll('[data-action]').forEach(function (button) {

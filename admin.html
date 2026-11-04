@@ -2,10 +2,14 @@
 <html lang="es">
 <head>
   <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#071c2c">
   <meta name="description" content="Panel administrativo de Vitrinazo Inmobiliaria">
   <title>Vitrinazo · Administración</title>
   <link rel="icon" type="image/png" href="./assets/logo-vitrinazo.png">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <link rel="apple-touch-icon" href="./assets/logo-vitrinazo.png">
   <link rel="stylesheet" href="./src/styles.css">
 </head>
 <body class="admin-app">
@@ -49,12 +53,18 @@
 
     <main class="admin-main">
       <header class="admin-topbar">
-        <button class="mobile-menu" id="mobileMenu" aria-label="Abrir menú"><span></span><span></span></button>
         <div><p id="adminBreadcrumb">Panel / Resumen</p><h1 id="adminTitle">Buenos días</h1></div>
         <div class="admin-topbar__actions">
-          <button class="icon-button" id="refreshAdmin" aria-label="Actualizar"><svg viewBox="0 0 24 24"><path d="M20 6v5h-5M4 18v-5h5M6.1 9a7 7 0 0 1 11.6-2.6L20 9M4 15l2.3 2.6A7 7 0 0 0 18 15"/></svg></button>
+          <button class="icon-button" id="refreshAdmin" type="button" aria-label="Actualizar información" title="Actualizar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 8A8 8 0 0 0 6 6M20 3v5h-5M4 16a8 8 0 0 0 14 2M4 21v-5h5"/></svg></button>
           <button class="button button--primary button--compact" id="quickCreate" type="button">＋ Nuevo registro</button>
-          <div class="admin-avatar">VI</div>
+          <div class="admin-account">
+            <button class="admin-avatar" id="adminAccountToggle" type="button" aria-label="Abrir mi cuenta" aria-expanded="false" aria-controls="adminAccountMenu">VI</button>
+            <div class="admin-account__menu" id="adminAccountMenu" hidden>
+              <div class="admin-account__identity"><strong id="adminAccountName">Administrador</strong><span id="adminAccountUser">Mi cuenta</span></div>
+              <button type="button" id="editAdminProfile"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21v-2a8 8 0 0 1 16 0v2"/></svg>Mi perfil y seguridad</button>
+              <button type="button" id="adminLogout" class="admin-account__logout"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4H4v16h5M13 8l4 4-4 4M8 12h13"/></svg>Cerrar sesión</button>
+            </div>
+          </div>
         </div>
       </header>
 
@@ -90,6 +100,31 @@
   <dialog class="modal admin-modal" id="manualPaymentDialog"><form class="modal__surface" id="manualPaymentForm"><button class="modal__close" type="button" data-dialog-close aria-label="Cerrar">×</button><p class="kicker" id="manualPaymentKicker">Pago agregado por el administrador</p><h2 id="manualPaymentTitle">Agregar pago recibido</h2><div class="form-grid"><label class="form-span">Contrato<select name="contratoId" required></select></label><label class="form-span">Meses que faltan por pagar<div class="month-picker" id="manualMonthPicker"><p>Selecciona un contrato para ver los meses que faltan por pagar.</p></div></label><label>Dinero recibido<input type="text" name="valor" inputmode="numeric" autocomplete="off" data-currency-input data-currency-min="1" required></label><label>Forma de pago<select name="metodo" required><option value="EFECTIVO">Efectivo</option><option value="TRANSFERENCIA">Transferencia</option><option value="CONSIGNACION">Depósito bancario</option></select></label><label>Fecha del pago<input type="date" name="fecha" required></label><label>Nota<input type="text" name="nota" maxlength="200" placeholder="Número del comprobante o una explicación"></label></div><div class="modal__actions"><button class="button button--ghost" type="button" data-dialog-close>Cancelar</button><button class="button button--primary" id="manualPaymentSubmit" type="submit">Guardar pago</button></div></form></dialog>
   <dialog class="modal admin-modal client-account-modal" id="clientAccountDialog"><div class="modal__surface"><button class="modal__close" type="button" data-dialog-close aria-label="Cerrar">×</button><p class="kicker">Cuenta del cliente</p><h2 id="clientAccountTitle">Información del cliente</h2><div class="client-account__identity" id="clientAccountIdentity"></div><div class="client-account__contracts" id="clientAccountContracts"></div><div class="client-account__summary" id="clientAccountSummary"></div><div class="client-account__content"><section><div class="client-account__head"><div><p class="kicker">Meses del arriendo</p><h3>Valores pendientes y pagados</h3></div></div><div class="client-account__months" id="clientAccountMonths"></div></section><section><div class="client-account__head"><div><p class="kicker">Movimientos</p><h3>Pagos registrados</h3></div><button class="button button--soft" type="button" data-action="manual-payment">Agregar pago</button></div><div class="client-account__payments" id="clientAccountPayments"></div></section></div></div></dialog>
   <dialog class="modal confirm-modal" id="deleteDialog"><form class="modal__surface" id="deleteForm"><button class="modal__close" type="button" data-dialog-close aria-label="Cerrar">×</button><div class="confirm-modal__icon" aria-hidden="true">!</div><p class="kicker">Confirmar eliminación</p><h2 id="deleteTitle">Eliminar registro</h2><p class="modal__intro" id="deleteMessage">Esta acción no se puede deshacer.</p><div class="modal__actions"><button class="button button--ghost" type="button" data-dialog-close>Cancelar</button><button class="button button--danger" type="submit">Sí, eliminar</button></div></form></dialog>
+  <dialog class="modal admin-modal profile-modal" id="adminProfileDialog" aria-labelledby="adminProfileTitle">
+    <form class="modal__surface" id="adminProfileForm" novalidate>
+      <button class="modal__close" type="button" data-dialog-close aria-label="Cerrar">×</button>
+      <div class="profile-modal__mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m12 3 8 3v6c0 5-8 9-8 9s-8-4-8-9V6Z"/><path d="m8 12 3 3 5-6"/></svg></div>
+      <p class="kicker">Tu espacio</p><h2 id="adminProfileTitle">Mi perfil y seguridad</h2>
+      <p class="modal__intro" id="adminProfileStatus" role="status">Cargando tu información…</p>
+      <fieldset class="profile-fields" id="adminProfileFields" disabled>
+        <div class="form-grid">
+          <label class="form-span">Nombre<input name="nombre" autocomplete="name" minlength="2" maxlength="100" required></label>
+          <label>Usuario<input name="usuario" autocomplete="username" minlength="3" maxlength="40" required></label>
+          <label>Teléfono<input name="telefono" type="tel" autocomplete="tel" maxlength="30"></label>
+          <label class="form-span">Correo electrónico<input name="email" type="email" autocomplete="email" maxlength="200"></label>
+        </div>
+        <details class="profile-security" id="adminPinDetails"><summary><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>Cambiar PIN<span aria-hidden="true">＋</span></summary>
+          <div class="form-grid">
+            <label class="form-span">PIN actual<input name="currentPin" type="password" inputmode="numeric" autocomplete="current-password" maxlength="12"></label>
+            <label>Nuevo PIN<input name="newPin" type="password" inputmode="numeric" autocomplete="new-password" maxlength="12" placeholder="De 4 a 12 números"></label>
+            <label>Repetir nuevo PIN<input name="confirmPin" type="password" inputmode="numeric" autocomplete="new-password" maxlength="12"></label>
+          </div>
+        </details>
+      </fieldset>
+      <p class="profile-feedback" id="adminProfileFeedback" role="status" hidden></p>
+      <div class="modal__actions"><button class="button button--ghost" type="button" data-dialog-close>Cancelar</button><button class="button button--primary" id="adminProfileSave" type="submit" disabled>Guardar cambios</button></div>
+    </form>
+  </dialog>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
   <script type="module" src="./src/admin.js"></script>
 </body>

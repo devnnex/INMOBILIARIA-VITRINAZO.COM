@@ -1,5 +1,17 @@
 # Contexto de Vitrinazo
 
+## Interfaz y administración
+
+- Usar diálogos, mensajes y confirmaciones con el diseño del sistema; nunca
+  `window.alert`, `window.confirm`, `window.prompt` ni avisos nativos de validación.
+- Abrir menús y formularios inmediatamente al clic y mostrar progreso durante
+  las peticiones. No retrasar la interfaz con esperas artificiales.
+- Mantener accesibles el perfil, el cierre de sesión y la navegación en móvil,
+  con áreas táctiles cómodas y soporte de modo PWA.
+- El PIN y el perfil se guardan mediante el backend autenticado de `Code.gs`.
+  No simular cambios de credenciales reales mediante almacenamiento local.
+  La publicación de GitHub Pages no actualiza Google Apps Script.
+
 Antes de cambiar pagos, simulación, cartera o su futura integración, leer
 [docs/FORTTU_HANDOFF.md](docs/FORTTU_HANDOFF.md).
 

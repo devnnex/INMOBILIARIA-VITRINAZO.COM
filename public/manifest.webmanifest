@@ -3,6 +3,8 @@
   "short_name": "Vitrinazo",
   "description": "Consulta y paga tu arriendo de forma clara y segura.",
   "start_url": "./index.html",
+  "scope": "./",
+  "id": "./",
   "display": "standalone",
   "background_color": "#f5f9fc",
   "theme_color": "#0a273b",
@@ -10,7 +12,7 @@
   "orientation": "portrait-primary",
   "icons": [
     {
-      "src": "./assets/logo-vitrinazo.png",
+      "src": "./icons/vitrinazo-256.png",
       "sizes": "256x256",
       "type": "image/png",
       "purpose": "any maskable"

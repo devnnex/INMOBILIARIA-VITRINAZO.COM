@@ -75,6 +75,9 @@ function apiOutput_(payload) {
       getDataVersion: getDataVersion,
       getPaymentStatus: getPaymentStatus,
       adminLogin: adminLogin,
+      getAdminProfile: getAdminProfile,
+      updateAdminProfile: updateAdminProfile,
+      adminLogout: adminLogout,
       getAdminDashboard: getAdminDashboard,
       getAdminPage: getAdminPage,
       getAdminSync: getAdminSync,
@@ -662,28 +665,92 @@ function applyPaymentAllocations_(payment) {
 
 function adminLogin(pin) {
   ensureProjectReady_();
-  const props = PropertiesService.getScriptProperties();
-  const sheet = getDb_().getSheetByName(APP.sheets.admins);
-  const admin = getRows_(sheet).find(function (item) {
+  return withScriptLock_(function () {
+    const sheet = getDb_().getSheetByName(APP.sheets.admins);
+    const admin = getRows_(sheet).find(function (item) {
+      return item.id === 'ADM-OWNER' && String(item.estado || '').toUpperCase() === 'ACTIVO';
+    });
+    if (!admin || !admin.pinSalt || !admin.pinHash) return { ok: false, needsSetup: true };
+    const submittedPin = String(pin || '').trim();
+    if (!safeEqual_(sha256Hex_(admin.pinSalt + submittedPin), admin.pinHash)) {
+      Utilities.sleep(400);
+      return { ok: false, message: 'PIN incorrecto.' };
+    }
+    const token = issueAdminSession_();
+    const row = findDataRow_(sheet, 'id', admin.id);
+    setCellByHeader_(sheet, row, APP.headers.ADMINISTRADORES, 'ultimoAcceso', nowIso_());
+    return { ok: true, token: token, expiresIn: 21600, admin: publicAdminProfile_(admin) };
+  });
+}
+
+function issueAdminSession_() {
+  const token = Utilities.getUuid().replace(/-/g, '') + Utilities.getUuid().replace(/-/g, '');
+  const version = PropertiesService.getScriptProperties().getProperty('ADMIN_SESSION_VERSION') || '1';
+  CacheService.getScriptCache().put('ADMIN_TOKEN_' + token, version, 21600);
+  return token;
+}
+
+function ownerAdmin_() {
+  const admin = getRows_(getDb_().getSheetByName(APP.sheets.admins)).find(function (item) {
     return item.id === 'ADM-OWNER' && String(item.estado || '').toUpperCase() === 'ACTIVO';
   });
-  if (!admin || !admin.pinSalt || !admin.pinHash) return { ok: false, needsSetup: true };
-  const submittedPin = String(pin || '').trim();
-  if (!safeEqual_(sha256Hex_(admin.pinSalt + submittedPin), admin.pinHash)) {
-    Utilities.sleep(400);
-    return { ok: false, message: 'PIN incorrecto.' };
-  }
-  const token = Utilities.getUuid().replace(/-/g, '') + Utilities.getUuid().replace(/-/g, '');
-  const sessionVersion = props.getProperty('ADMIN_SESSION_VERSION') || '1';
-  CacheService.getScriptCache().put('ADMIN_TOKEN_' + token, sessionVersion, 21600);
-  const row = findDataRow_(sheet, 'id', admin.id);
-  setCellByHeader_(sheet, row, APP.headers.ADMINISTRADORES, 'ultimoAcceso', nowIso_());
-  return {
-    ok: true,
-    token: token,
-    expiresIn: 21600,
-    admin: { id: admin.id, usuario: admin.usuario, nombre: admin.nombre }
-  };
+  if (!admin) throw new Error('La cuenta administrativa no está disponible.');
+  return admin;
+}
+
+function publicAdminProfile_(admin) {
+  const stored = PropertiesService.getScriptProperties().getProperty('ADMIN_PROFILE_ADM-OWNER');
+  let contact = {};
+  try { contact = JSON.parse(stored || '{}') || {}; } catch (error) { /* Optional contact data. */ }
+  return { id: admin.id, usuario: admin.usuario, nombre: admin.nombre, email: String(contact.email || ''), telefono: String(contact.telefono || '') };
+}
+
+function getAdminProfile(token) {
+  assertAdmin_(token);
+  return { admin: publicAdminProfile_(ownerAdmin_()) };
+}
+
+function updateAdminProfile(token, input) {
+  assertAdmin_(token);
+  return withScriptLock_(function () {
+    assertAdmin_(token);
+    const admin = ownerAdmin_();
+    const data = input || {};
+    const nombre = String(data.nombre || '').trim();
+    const usuario = String(data.usuario || '').trim();
+    const email = String(data.email || '').trim();
+    const telefono = String(data.telefono || '').trim();
+    if (nombre.length < 2 || nombre.length > 100 || /^[=+@-]/.test(nombre) || /[\r\n\t]/.test(nombre)) throw new Error('Escribe un nombre válido de 2 a 100 caracteres.');
+    if (!/^[a-zA-Z][a-zA-Z0-9_.-]{2,39}$/.test(usuario)) throw new Error('El usuario debe tener entre 3 y 40 letras, números, puntos o guiones, y comenzar con una letra.');
+    if (email && (email.length > 200 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))) throw new Error('Revisa el correo electrónico.');
+    if (telefono && !/^[+\d () .-]{5,30}$/.test(telefono)) throw new Error('Revisa el número de teléfono.');
+    const newPin = String(data.newPin || '');
+    const changingPin = Boolean(newPin || data.currentPin || data.confirmPin);
+    if (changingPin) {
+      if (!safeEqual_(sha256Hex_(admin.pinSalt + String(data.currentPin || '')), admin.pinHash)) throw new Error('El PIN actual no es correcto.');
+      if (!/^\d{4,12}$/.test(newPin)) throw new Error('El nuevo PIN debe tener entre 4 y 12 números.');
+      if (newPin !== String(data.confirmPin || '')) throw new Error('Los nuevos PIN no coinciden.');
+    }
+    const sheet = getDb_().getSheetByName(APP.sheets.admins);
+    const row = findDataRow_(sheet, 'id', admin.id);
+    setCellByHeader_(sheet, row, APP.headers.ADMINISTRADORES, 'nombre', nombre);
+    setCellByHeader_(sheet, row, APP.headers.ADMINISTRADORES, 'usuario', usuario);
+    const props = PropertiesService.getScriptProperties();
+    props.setProperty('ADMIN_PROFILE_ADM-OWNER', JSON.stringify({ email: email, telefono: telefono }));
+    if (changingPin) {
+      const salt = Utilities.getUuid().replace(/-/g, '');
+      setCellByHeader_(sheet, row, APP.headers.ADMINISTRADORES, 'pinSalt', salt);
+      setCellByHeader_(sheet, row, APP.headers.ADMINISTRADORES, 'pinHash', sha256Hex_(salt + newPin));
+      props.setProperty('ADMIN_SESSION_VERSION', String(Number(props.getProperty('ADMIN_SESSION_VERSION') || '1') + 1));
+      CacheService.getScriptCache().remove('ADMIN_TOKEN_' + token);
+    }
+    return { ok: true, admin: publicAdminProfile_({ id: admin.id, nombre: nombre, usuario: usuario }), token: changingPin ? issueAdminSession_() : token, pinChanged: changingPin };
+  });
+}
+
+function adminLogout(token) {
+  CacheService.getScriptCache().remove('ADMIN_TOKEN_' + String(token || ''));
+  return { ok: true };
 }
 
 function getAdminDashboard(token, limit) {
