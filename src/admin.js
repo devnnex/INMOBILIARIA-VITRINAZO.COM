@@ -503,15 +503,22 @@ function renderLedger() {
 function renderPayments() {
   document.getElementById('paymentsTable').innerHTML = state.data.payments.map(function (payment) {
     const editable = isEditableManualPayment(payment);
-    const actions = editable ? rowActions('payment', payment.id) : '<span class="protected-record" title="Los pagos bancarios se conservan como historial">Protegido</span>';
-    const reference = String(payment.id || '').indexOf('TEMP-') === 0 ? 'Pago reciente' : payment.referencia;
+    const actions = editable ? rowActions('payment', payment.id) : '<span class="badge badge--paid protected-record" title="Los pagos bancarios se conservan como historial"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 4 6v6c0 5 8 9 8 9s8-4 8-9V6l-8-3Z"/><path d="m8.5 12 2.3 2.3 4.7-4.7"/></svg>Protegido</span>';
+    const reference = paymentDisplayReference(payment);
+    const fullReference = [payment.referencia, payment.id, payment.transaccionId].filter(Boolean).join(' · ');
     const contract = state.data.contracts.find(item => item.id === payment.contratoId);
-    return '<tr data-payment-id="' + escapeHtml(payment.id) + '" data-status="' + escapeHtml(payment.estado) + '"><td><strong>' + escapeHtml(reference) + '</strong><small>' + escapeHtml(payment.transaccionId || 'Pago agregado aquí') + '</small></td><td>' + escapeHtml(payment.contratoId) + '<small>' + escapeHtml(payment.clienteNombre || contract?.clienteNombre || '') + '</small></td><td><strong>' + formatMoney(payment.valor) + '</strong><small class="payment-month-labels">' + escapeHtml(paymentMonthLabels(payment)) + '</small></td><td>' + escapeHtml(formatPaymentMethod(payment.metodo)) + '</td><td>' + formatDate(payment.pagadoEn || payment.creadoEn) + '</td><td><span class="badge ' + (payment.estado === 'APROBADO' ? 'badge--paid' : payment.estado === 'PENDIENTE' ? 'badge--pending' : 'badge--overdue') + '">' + escapeHtml(payment.estado) + '</span></td><td>' + actions + '</td></tr>';
+    return '<tr data-payment-id="' + escapeHtml(payment.id) + '" data-search-reference="' + escapeHtml(fullReference) + '" data-status="' + escapeHtml(payment.estado) + '"><td><strong class="payment-reference" title="' + escapeHtml(fullReference) + '">' + escapeHtml(reference) + '</strong></td><td>' + escapeHtml(payment.contratoId) + '<small>' + escapeHtml(payment.clienteNombre || contract?.clienteNombre || '') + '</small></td><td><strong>' + formatMoney(payment.valor) + '</strong><small class="payment-month-labels">' + escapeHtml(paymentMonthLabels(payment)) + '</small></td><td>' + escapeHtml(formatPaymentMethod(payment.metodo)) + '</td><td>' + formatDate(payment.pagadoEn || payment.creadoEn) + '</td><td><span class="badge ' + (payment.estado === 'APROBADO' ? 'badge--paid' : payment.estado === 'PENDIENTE' ? 'badge--pending' : 'badge--overdue') + '">' + escapeHtml(payment.estado) + '</span></td><td>' + actions + '</td></tr>';
   }).join('') || emptyRow(7, 'No hay pagos registrados.');
   labelTableCells('paymentsTable');
   applyTableFilters('payments');
   renderPagination('payments');
   state.rendered.payments = true;
+}
+
+function paymentDisplayReference(payment) {
+  if (String(payment.id || '').startsWith('TEMP-')) return 'Pago reciente';
+  const code = String(payment.referencia || payment.id || '').replace(/[^a-z0-9]/gi, '').slice(-8).toUpperCase();
+  return code ? 'Pago #' + code : 'Pago reciente';
 }
 
 function paymentMonthLabels(payment) {
@@ -571,7 +578,7 @@ function applyTableFilters(section) {
   const status = normalizeFilterText(filter && filter.value);
   body.querySelectorAll('tr').forEach(function (row) {
     if (row.querySelector('[colspan]')) { row.hidden = false; return; }
-    const text = normalizeFilterText(row.textContent);
+    const text = normalizeFilterText(row.textContent + ' ' + (row.dataset.searchReference || ''));
     const matchesSearch = terms.every(function (term) { return text.indexOf(term) !== -1; });
     const matchesStatus = !status || normalizeFilterText(row.dataset.status) === status;
     row.hidden = !(matchesSearch && matchesStatus);
@@ -640,7 +647,7 @@ function renderClientAccount() {
     return '<article class="account-month' + (Number(item.saldo) <= 0 ? ' is-paid' : '') + '" data-ledger-id="' + escapeHtml(item.id) + '"><div><strong>' + escapeHtml(formatRentalMonth(item.periodo, item.fechaVencimiento)) + '</strong><small>Pago límite: ' + formatDate(item.fechaVencimiento) + '</small><span class="account-month__changes">' + escapeHtml(changes) + '</span></div><div class="account-month__amount"><span>Falta por pagar</span><strong>' + formatMoney(item.saldo) + '</strong><span class="badge ' + badgeClass(item.estadoCalculado) + '">' + escapeHtml(item.estadoCalculado) + '</span></div><button class="row-action" type="button" data-adjust="' + escapeHtml(item.id) + '"><span aria-hidden="true">✎</span><b>Cambiar valor</b></button></article>';
   }).join('') : '<p class="client-account__empty">No hay meses registrados para este contrato.</p>';
   document.getElementById('clientAccountPayments').innerHTML = payments.length ? payments.map(function (payment) {
-    return '<article class="account-payment"><div><strong>' + escapeHtml(payment.referencia || payment.id) + '</strong><small>' + formatDate(payment.pagadoEn || payment.creadoEn) + ' · ' + escapeHtml(formatPaymentMethod(payment.metodo)) + '</small><small class="payment-month-labels">' + escapeHtml(paymentMonthLabels(payment)) + '</small></div><strong>' + formatMoney(payment.valor) + '</strong></article>';
+    return '<article class="account-payment"><div><strong class="payment-reference" title="' + escapeHtml(payment.referencia || payment.id) + '">' + escapeHtml(paymentDisplayReference(payment)) + '</strong><small>' + formatDate(payment.pagadoEn || payment.creadoEn) + ' · ' + escapeHtml(formatPaymentMethod(payment.metodo)) + '</small><small class="payment-month-labels">' + escapeHtml(paymentMonthLabels(payment)) + '</small></div><strong>' + formatMoney(payment.valor) + '</strong></article>';
   }).join('') : '<p class="client-account__empty">Todavía no hay pagos registrados para este contrato.</p>';
 }
 

@@ -358,7 +358,9 @@ tr.is-saving td small { color: #2387ad; }
 .row-action--danger { color: #b73942; background: #fff0f1; }
 .row-action--danger:hover { color: #982b33; background: #ffe1e3; }
 .row-action:disabled { cursor: wait; opacity: .55; }
-.protected-record { display: inline-flex; align-items: center; border-radius: 999px; padding: .35rem .55rem; color: #758b96; background: #f2f6f8; font-size: .62rem; font-weight: 800; }
+.protected-record { gap: .3rem; white-space: nowrap; }
+.protected-record svg { width: 13px; height: 13px; flex-shrink: 0; }
+.payment-reference { white-space: nowrap; font-variant-numeric: tabular-nums; letter-spacing: .01em; }
 .admin-mobile-nav { display: none; }
 .admin-modal { width: min(640px, calc(100% - 28px)); }
 .client-account-modal { width: min(940px, calc(100% - 28px)); }

@@ -208,6 +208,13 @@ try {
   assert.match(await evaluate(`document.getElementById('statGrid').textContent`), /2.000.000/);
   assert.match(await evaluate(`document.getElementById('paymentsTable').textContent`), /Marzo de 2026/);
   assert.match(await evaluate(`document.getElementById('paymentsTable').textContent`), /Persona de prueba/);
+  assert.equal(await evaluate(`Array.from(document.querySelectorAll('#paymentsTable .payment-reference')).every(item=>/^Pago #[A-Z0-9]{8}$/.test(item.textContent) && item.title.length > item.textContent.length)`), true);
+  assert.equal(await evaluate(`document.querySelectorAll('#paymentsTable .protected-record.badge--paid svg').length`), 2);
+  assert.equal(await evaluate(`(()=>{const row=document.querySelector('#paymentsTable tr');return getComputedStyle(row.querySelector('.protected-record')).backgroundColor===getComputedStyle(row.querySelector('td:nth-child(6) .badge')).backgroundColor;})()`), true);
+  await evaluate(`(()=>{const input=document.querySelector('[data-table-search="payments"]');input.value=document.querySelector('#paymentsTable tr').dataset.searchReference.split(' · ')[0];input.dispatchEvent(new Event('input',{bubbles:true}));})()`);
+  await wait(`Array.from(document.querySelectorAll('#paymentsTable tr')).filter(row=>!row.hidden).length === 1`);
+  await evaluate(`(()=>{const input=document.querySelector('[data-table-search="payments"]');input.value='';input.dispatchEvent(new Event('input',{bubbles:true}));})()`);
+  await wait(`Array.from(document.querySelectorAll('#paymentsTable tr')).filter(row=>!row.hidden).length === 2`);
   await click('[data-client-account="CLI-PRUEBA-1"]');
   await wait(`document.querySelectorAll('#clientAccountMonths .badge--paid').length === 3`);
   assert.match(await evaluate(`document.getElementById('clientAccountMonths').textContent`), /Marzo de 2026/);
@@ -216,6 +223,7 @@ try {
   await screenshot('vitrinazo-admin-simulated-account');
   await click('#clientAccountDialog [data-dialog-close]');
   await click('[data-view="payments"]');
+  await new Promise(resolve => setTimeout(resolve, 350));
   await screenshot('vitrinazo-admin-simulated-payments');
   assert.equal(await evaluate(`window.__backendActions.some(action=> !['adminLogin','getAdminDashboard','getAdminSync','getClientAccountForAdmin'].includes(action))`), false);
   assert.deepEqual(errors, []);
