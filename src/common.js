@@ -570,6 +570,7 @@
       if (!DEMO_MODE) {
         return fetch(APPS_SCRIPT_URL, {
           method: 'POST',
+          keepalive: method === 'adminLogout',
           redirect: 'follow',
           headers: { 'Content-Type': 'text/plain;charset=utf-8' },
           body: JSON.stringify({ action: method, args: args })

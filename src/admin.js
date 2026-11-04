@@ -1,11 +1,13 @@
 import { Backend, formatMoney, formatDate, formatRentalMonth, formatPaymentMethod, escapeHtml, initials, debounce, showToast, setBusy, setPageLoader } from './common.js';
 import { setupAdminAccount } from './admin-account.js';
+import { createAdminSession } from './admin-session.js';
 
 'use strict';
 
 const PAGE_SIZE = 1000;
 const state = {
-  token: sessionStorage.getItem('vitrinazo-admin-token') || '',
+  token: '',
+  sessionEpoch: 0,
   data: null,
   version: 0,
   versions: {},
@@ -39,16 +41,48 @@ const deleteDialog = document.getElementById('deleteDialog');
 const deleteForm = document.getElementById('deleteForm');
 const clientAccountDialog = document.getElementById('clientAccountDialog');
 const syncStatus = document.getElementById('syncStatus');
+const session = createAdminSession({ onExpire: () => {
+  const token = state.token;
+  clearAdminSession();
+  if (token) Backend.call('adminLogout', token).catch(() => {});
+  showToast('Tu sesión venció. Ingresa tu PIN para continuar.');
+} });
 const account = setupAdminAccount({
   getToken: () => state.token,
-  setToken: token => { state.token = token; sessionStorage.setItem('vitrinazo-admin-token', token); },
+  setToken: setAdminSession,
   onLogout: clearAdminSession,
   onSessionError: error => handleAdminError(error, false)
 });
 
-function clearAdminSession() {
-  state.token = '';
+function setAdminSession(token, metadata) {
+  state.token = token;
+  session.start(metadata);
+}
+
+// Discard and revoke tokens saved by older versions. Never restore login from
+// sessionStorage, localStorage, a URL or another tab.
+try {
+  const legacyToken = sessionStorage.getItem('vitrinazo-admin-token');
   sessionStorage.removeItem('vitrinazo-admin-token');
+  if (legacyToken) Backend.call('adminLogout', legacyToken).catch(() => {});
+} catch (error) { /* Login also works when browser storage is disabled. */ }
+
+window.addEventListener('pagehide', function () {
+  const token = state.token;
+  clearAdminSession();
+  if (token) Backend.call('adminLogout', token).catch(() => {});
+});
+window.addEventListener('pageshow', function (event) { if (event.persisted) clearAdminSession(); });
+window.addEventListener('focus', () => { if (state.token) session.check(); });
+document.addEventListener('visibilitychange', () => { if (!document.hidden && state.token) session.check(); });
+['click', 'submit'].forEach(type => document.addEventListener(type, event => {
+  if (state.token && !session.check()) { event.preventDefault(); event.stopImmediatePropagation(); }
+}, true));
+
+function clearAdminSession() {
+  state.sessionEpoch++;
+  session.clear();
+  state.token = '';
   clearTimeout(state.syncTimer);
   state.data = null;
   state.rendered = {};
@@ -56,10 +90,19 @@ function clearAdminSession() {
   state.version = 0;
   state.pageInfo = {};
   state.manualLedger = [];
+  state.manualEditingPayment = null;
+  state.idAliases = {};
+  state.deletedKeys.clear();
   state.clientAccountId = '';
   state.clientAccountContractId = '';
   state.deleteTarget = null;
   document.querySelectorAll('dialog[open]').forEach(dialog => dialog.close());
+  ['statGrid', 'clientsTable', 'propertiesTable', 'contractsTable', 'paymentsTable', 'ledgerTable', 'recentContracts', 'clientAccountIdentity', 'clientAccountContracts', 'clientAccountSummary', 'clientAccountMonths', 'clientAccountPayments', 'recordFields', 'manualMonthPicker'].forEach(id => document.getElementById(id)?.replaceChildren());
+  ['collectedValue', 'outstandingValue', 'collectionPercent'].forEach(id => { document.getElementById(id).textContent = '—'; });
+  document.getElementById('collectionDonut').style.setProperty('--percent', 0);
+  manualForm.elements.contratoId.replaceChildren();
+  document.getElementById('clientAccountTitle').textContent = 'Información del cliente';
+  [recordForm, adjustForm, manualForm].forEach(form => form.reset());
   account.reset();
   loginForm.reset();
   document.getElementById('adminPin').type = 'password';
@@ -86,12 +129,16 @@ document.getElementById('togglePin').addEventListener('click', function () {
 loginForm.addEventListener('submit', async function (event) {
   event.preventDefault();
   const button = loginForm.querySelector('[type="submit"]');
+  if (button.disabled) return;
+  const epoch = state.sessionEpoch;
   setBusy(button, true, 'Validando');
   try {
     const result = await Backend.call('adminLogin', new FormData(loginForm).get('pin'));
+    if (state.sessionEpoch !== epoch) { if (result.token) Backend.call('adminLogout', result.token).catch(() => {}); return; }
     if (!result.ok) throw new Error(result.needsSetup ? 'La inicialización automática aún no terminó. Reintenta en unos segundos o actualiza el despliegue de Apps Script.' : result.message || 'No fue posible ingresar.');
-    state.token = result.token;
-    sessionStorage.setItem('vitrinazo-admin-token', state.token);
+    if (typeof result.token !== 'string' || !result.token) throw new Error('No fue posible validar la sesión. Ingresa de nuevo.');
+    setAdminSession(result.token, result);
+    if (!state.token) return;
     account.load(result.admin);
     loginForm.reset();
     await enterAdmin();
@@ -345,13 +392,16 @@ function markRevision(record) {
 }
 
 function reconcileAfterFailure(error) {
+  if (!state.token || !state.data) return;
+  const token = state.token;
   setSyncStatus('Revisando el último cambio…');
   showToast(error.message, 'error');
   const pending = {};
   ['clients', 'properties', 'contracts', 'ledger', 'payments'].forEach(function (section) {
     pending[section] = (state.data[section] || []).filter(function (item) { return item.__pending; });
   });
-  Backend.call('getAdminDashboard', state.token, PAGE_SIZE).then(function (result) {
+  Backend.call('getAdminDashboard', token, PAGE_SIZE).then(function (result) {
+    if (state.token !== token || !state.data) return;
     state.data = result;
     state.version = result.version || state.version;
     state.versions = result.versions || state.versions;
@@ -1490,5 +1540,3 @@ document.querySelectorAll('[data-table-search]').forEach(function (input) {
 document.querySelectorAll('[data-table-filter]').forEach(function (select) {
   select.addEventListener('change', function () { applyTableFilters(select.dataset.tableFilter); });
 });
-
-if (state.token) enterAdmin().catch(function () { /* handled above */ });

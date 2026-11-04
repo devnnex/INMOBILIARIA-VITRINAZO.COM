@@ -72,6 +72,7 @@ export function setupAdminAccount({ getToken, setToken, onLogout, onSessionError
     clearSecrets();
     message('');
     form.querySelectorAll('[aria-invalid]').forEach(input => input.removeAttribute('aria-invalid'));
+    document.getElementById('adminPinDetails').open = window.matchMedia('(min-width: 1024px)').matches;
     paint();
     dialog.showModal(); // Open immediately; network never delays the click.
     if (!ready) load();
@@ -111,7 +112,7 @@ export function setupAdminAccount({ getToken, setToken, onLogout, onSessionError
       const result = await Backend.call('updateAdminProfile', token, data);
       if (getToken() !== token) { if (result.token) Backend.call('adminLogout', result.token).catch(() => {}); return; }
       if (!result.ok) throw new Error(result.message || 'No fue posible guardar los cambios.');
-      setToken(result.token || token);
+      setToken(result.token || token, result);
       profile = result.admin;
       clearSecrets();
       document.getElementById('adminPinDetails').open = false;

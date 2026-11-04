@@ -100,7 +100,7 @@ try {
         ? {ok:true,data:{found:true,version:1,contracts:[contract]}}
         : action==='syncAccount' ? {ok:true,data:{changed:false,version:1}}
         : {ok:false,error:'Acción no permitida.'};
-      if(action==='adminLogin')result={ok:true,data:args[0]===adminPin?{ok:true,token:adminToken,admin:adminProfile}:{ok:false,message:'PIN incorrecto.'}};
+      if(action==='adminLogin')result={ok:true,data:args[0]===adminPin?{ok:true,token:adminToken,admin:adminProfile,...(window.__expiresSoon?{serverNow:Date.parse('2026-11-05T04:59:56Z'),expiresAt:Date.parse('2026-11-05T05:00:00Z')}:{expiresIn:21600})}:{ok:false,message:'PIN incorrecto.'}};
       if(action==='getAdminProfile' && !window.__legacyAdmin)result={ok:true,data:{admin:adminProfile}};
       if(action==='updateAdminProfile'){
         const data=args[1],changing=Boolean(data.newPin);
@@ -219,6 +219,9 @@ try {
   const adminLoad = waitForLoad();
   await cdp('Page.navigate', { url: 'http://127.0.0.1:5178/admin.html' });
   await adminLoad;
+  await wait(`document.getElementById('adminLoginForm') && document.readyState === 'complete'`);
+  assert.equal(await evaluate(`document.getElementById('adminShell').hidden`), true);
+  await evaluate(`document.getElementById('adminPin').value='1234';document.getElementById('adminLoginForm').requestSubmit()`);
   await wait(`document.getElementById('experienceLoader')?.classList.contains('is-visible') && getComputedStyle(document.getElementById('experienceLoader')).opacity === '1'`);
   assert.equal(await evaluate(`document.querySelectorAll('.experience-loader__scene img').length`), 0);
   assert.ok(await evaluate(`document.querySelectorAll('.experience-loader__brand path').length >= 4`));
@@ -260,6 +263,15 @@ try {
   await click('#editAdminProfile');
   assert.equal(await evaluate(`document.getElementById('adminProfileDialog').open`), true);
   await wait(`!document.getElementById('adminProfileFields').disabled`);
+  const desktopProfile = await evaluate(`(()=>{const surface=document.querySelector('#adminProfileDialog .modal__surface');const dialog=document.getElementById('adminProfileDialog');return {width:dialog.getBoundingClientRect().width,height:dialog.getBoundingClientRect().height,scroll:surface.scrollHeight>surface.clientHeight};})()`);
+  assert.ok(desktopProfile.width >= 900 && desktopProfile.width > desktopProfile.height, JSON.stringify(desktopProfile));
+  assert.equal(desktopProfile.scroll, false);
+  await screenshot('vitrinazo-admin-profile-desktop');
+  for (const [width, height] of [[1280, 720], [1024, 640]]) {
+    await cdp('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: false });
+    assert.equal(await evaluate(`(()=>{const s=document.querySelector('#adminProfileDialog .modal__surface');return s.scrollHeight>s.clientHeight;})()`), false);
+  }
+  await cdp('Emulation.setDeviceMetricsOverride', { width: 1280, height: 1000, deviceScaleFactor: 1, mobile: false });
   await evaluate(`(()=>{const f=document.getElementById('adminProfileForm');f.elements.nombre.value='María López';f.elements.usuario.value='maria.admin';f.elements.email.value='incorrecto';f.requestSubmit();})()`);
   assert.match(await evaluate(`document.getElementById('adminProfileFeedback').textContent`), /correo/);
   await evaluate(`(()=>{const f=document.getElementById('adminProfileForm');f.elements.email.value='maria@example.com';f.elements.telefono.value='+57 300 123 4567';f.requestSubmit();})()`);
@@ -272,7 +284,7 @@ try {
   assert.match(await evaluate(`document.getElementById('adminProfileFeedback').textContent`), /no coinciden/);
   await evaluate(`(()=>{const f=document.getElementById('adminProfileForm');f.elements.confirmPin.value='5678';f.requestSubmit();})()`);
   await wait(`document.getElementById('adminProfileFeedback').textContent.includes('PIN actualizado')`);
-  assert.equal(await evaluate(`sessionStorage.getItem('vitrinazo-admin-token')`), 'rotated-admin-test');
+  assert.equal(await evaluate(`sessionStorage.getItem('vitrinazo-admin-token')`), null);
   for (const width of [390, 280]) {
     await cdp('Emulation.setDeviceMetricsOverride', { width, height: 844, deviceScaleFactor: 1, mobile: true });
     await evaluate(`document.getElementById('adminPinDetails').open=true`);
@@ -311,6 +323,27 @@ try {
   await evaluate(`(()=>{const pin=document.getElementById('adminPin');pin.addEventListener('invalid',event=>window.__invalidCancelled=event.defaultPrevented,{once:true});document.getElementById('adminLoginForm').requestSubmit();})()`);
   assert.equal(await evaluate(`window.__invalidCancelled`), true);
   assert.match(await evaluate(`document.getElementById('toast').textContent`), /Completa/);
+  // Reloads and fresh tabs must never restore an administrative session.
+  await evaluate(`document.getElementById('adminPin').value='5678';document.getElementById('adminLoginForm').requestSubmit()`);
+  await wait(`!document.getElementById('adminShell').hidden && document.getElementById('experienceLoader').hidden`);
+  await reload();
+  await wait(`document.getElementById('adminLoginForm') && document.readyState === 'complete'`);
+  assert.equal(await evaluate(`document.getElementById('adminShell').hidden`), true);
+  assert.equal(await evaluate(`window.__backendActions.includes('getAdminDashboard')`), false);
+  await evaluate(`sessionStorage.setItem('vitrinazo-admin-token','legacy-stored-token')`);
+  await reload();
+  await wait(`document.getElementById('adminLoginForm') && document.readyState === 'complete'`);
+  assert.equal(await evaluate(`document.getElementById('adminShell').hidden && !sessionStorage.getItem('vitrinazo-admin-token')`), true);
+  assert.equal(await evaluate(`window.__backendActions.includes('getAdminDashboard')`), false);
+  // Server time is 23:59:56 in Colombia, regardless of the test machine clock.
+  await evaluate(`window.__expiresSoon=true;document.getElementById('adminPin').value='1234';document.getElementById('adminLoginForm').requestSubmit()`);
+  await wait(`!document.getElementById('adminShell').hidden && document.getElementById('experienceLoader').hidden`);
+  await wait(`document.getElementById('adminShell').hidden && document.getElementById('toast').textContent.includes('sesión venció')`);
+  assert.equal(await evaluate(`document.getElementById('paymentsTable').textContent`), '');
+  await evaluate(`window.__expiresSoon=false;document.getElementById('adminPin').value='1234';document.getElementById('adminLoginForm').requestSubmit()`);
+  await wait(`!document.getElementById('adminShell').hidden && document.getElementById('experienceLoader').hidden`);
+  await evaluate(`window.dispatchEvent(new PageTransitionEvent('pageshow',{persisted:true}))`);
+  assert.equal(await evaluate(`document.getElementById('adminShell').hidden`), true);
   assert.deepEqual(errors, []);
-  console.log('PASS: payment parity, live updates, mobile loader without images, custom profile and PIN validation, token rotation, immediate logout during refresh, old-backend compatibility, no native dialogs, zero production writes.');
+  console.log('PASS: payment parity, custom responsive profile without desktop scrolling, PIN validation, mandatory login after reload, Colombia midnight expiry, bfcache lock, no native dialogs, zero production writes.');
 } finally { socket.close(); }

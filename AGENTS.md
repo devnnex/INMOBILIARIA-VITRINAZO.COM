@@ -11,6 +11,10 @@
 - El PIN y el perfil se guardan mediante el backend autenticado de `Code.gs`.
   No simular cambios de credenciales reales mediante almacenamiento local.
   La publicación de GitHub Pages no actualiza Google Apps Script.
+- El administrador ingresa su PIN en cada carga, recarga o nueva pestaña. No
+  persistir ni restaurar su token. Al llegar a las 00:00 de `America/Bogota`,
+  expirar la sesión en interfaz y servidor; revisar también al volver del fondo.
+- El perfil usa dos columnas en PC y conserva desplazamiento en móvil/tablet.
 
 Antes de cambiar pagos, simulación, cartera o su futura integración, leer
 [docs/FORTTU_HANDOFF.md](docs/FORTTU_HANDOFF.md).

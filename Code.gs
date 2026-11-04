@@ -666,6 +666,10 @@ function applyPaymentAllocations_(payment) {
 function adminLogin(pin) {
   ensureProjectReady_();
   return withScriptLock_(function () {
+    const props = PropertiesService.getScriptProperties();
+    let attempts = {};
+    try { attempts = JSON.parse(props.getProperty('ADMIN_LOGIN_GUARD') || '{}') || {}; } catch (error) { /* Empty guard. */ }
+    if (Number(attempts.blockedUntil || 0) > Date.now()) return { ok: false, message: 'Demasiados intentos. Reintenta en unos minutos.' };
     const sheet = getDb_().getSheetByName(APP.sheets.admins);
     const admin = getRows_(sheet).find(function (item) {
       return item.id === 'ADM-OWNER' && String(item.estado || '').toUpperCase() === 'ACTIVO';
@@ -673,21 +677,27 @@ function adminLogin(pin) {
     if (!admin || !admin.pinSalt || !admin.pinHash) return { ok: false, needsSetup: true };
     const submittedPin = String(pin || '').trim();
     if (!safeEqual_(sha256Hex_(admin.pinSalt + submittedPin), admin.pinHash)) {
-      Utilities.sleep(400);
+      const failures = Number(attempts.blockedUntil || 0) ? 1 : Number(attempts.failures || 0) + 1;
+      props.setProperty('ADMIN_LOGIN_GUARD', JSON.stringify({ failures: failures, blockedUntil: failures >= 5 ? Date.now() + 5 * 60 * 1000 : 0 }));
       return { ok: false, message: 'PIN incorrecto.' };
     }
-    const token = issueAdminSession_();
+    props.setProperty('ADMIN_LOGIN_GUARD', '{}');
+    const session = issueAdminSession_();
     const row = findDataRow_(sheet, 'id', admin.id);
     setCellByHeader_(sheet, row, APP.headers.ADMINISTRADORES, 'ultimoAcceso', nowIso_());
-    return { ok: true, token: token, expiresIn: 21600, admin: publicAdminProfile_(admin) };
+    return Object.assign({ ok: true, admin: publicAdminProfile_(admin) }, session);
   });
 }
 
 function issueAdminSession_() {
   const token = Utilities.getUuid().replace(/-/g, '') + Utilities.getUuid().replace(/-/g, '');
   const version = PropertiesService.getScriptProperties().getProperty('ADMIN_SESSION_VERSION') || '1';
-  CacheService.getScriptCache().put('ADMIN_TOKEN_' + token, version, 21600);
-  return token;
+  const now = Date.now();
+  const day = Utilities.formatDate(new Date(now), APP.timezone, 'yyyy-MM-dd');
+  const midnight = Date.parse(day + 'T00:00:00-05:00') + 24 * 60 * 60 * 1000;
+  const expiresAt = Math.min(now + 21600 * 1000, midnight);
+  CacheService.getScriptCache().put('ADMIN_TOKEN_' + token, JSON.stringify({ version: version, day: day, expiresAt: expiresAt }), Math.max(1, Math.floor((expiresAt - now) / 1000)));
+  return { token: token, expiresAt: expiresAt, serverNow: now, expiresIn: Math.max(1, Math.floor((expiresAt - now) / 1000)) };
 }
 
 function ownerAdmin_() {
@@ -744,7 +754,8 @@ function updateAdminProfile(token, input) {
       props.setProperty('ADMIN_SESSION_VERSION', String(Number(props.getProperty('ADMIN_SESSION_VERSION') || '1') + 1));
       CacheService.getScriptCache().remove('ADMIN_TOKEN_' + token);
     }
-    return { ok: true, admin: publicAdminProfile_({ id: admin.id, nombre: nombre, usuario: usuario }), token: changingPin ? issueAdminSession_() : token, pinChanged: changingPin };
+    const session = changingPin ? issueAdminSession_() : { token: token, expiresAt: assertAdmin_(token).expiresAt, serverNow: Date.now() };
+    return Object.assign({ ok: true, admin: publicAdminProfile_({ id: admin.id, nombre: nombre, usuario: usuario }), pinChanged: changingPin }, session);
   });
 }
 
@@ -1310,9 +1321,17 @@ function deleteManualPayment(token, id) {
 
 function assertAdmin_(token) {
   const expectedVersion = PropertiesService.getScriptProperties().getProperty('ADMIN_SESSION_VERSION') || '1';
-  if (!token || CacheService.getScriptCache().get('ADMIN_TOKEN_' + token) !== expectedVersion) {
-    throw new Error('Tu sesión administrativa venció. Ingresa de nuevo.');
+  const invalid = function () { throw new Error('Tu sesión administrativa venció. Ingresa de nuevo.'); };
+  if (typeof token !== 'string' || !/^[a-f0-9]{64}$/.test(token)) return invalid();
+  const cache = CacheService.getScriptCache();
+  let session;
+  try { session = JSON.parse(cache.get('ADMIN_TOKEN_' + token) || 'null'); } catch (error) { return invalid(); }
+  if (!session || session.version !== expectedVersion || !Number.isFinite(session.expiresAt) ||
+      Date.now() >= session.expiresAt || session.day !== Utilities.formatDate(new Date(), APP.timezone, 'yyyy-MM-dd')) {
+    cache.remove('ADMIN_TOKEN_' + token);
+    return invalid();
   }
+  return session;
 }
 
 // -----------------------------------------------------------------------------

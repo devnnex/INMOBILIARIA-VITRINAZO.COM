@@ -8,14 +8,17 @@ const source = readFileSync(new URL('../Code.gs', import.meta.url), 'utf8');
 const hash = value => createHash('sha256').update(value).digest('hex');
 const input = { nombre: 'María López', usuario: 'maria.admin', email: 'maria@example.com', telefono: '+57 300 555 1234' };
 function harness() {
+  let now = Date.parse('2026-11-04T17:00:00Z');
+  class Clock extends Date { constructor(...args) { super(...(args.length ? args : [now])); } static now() { return now; } }
   const admin = { id: 'ADM-OWNER', estado: 'ACTIVO', nombre: 'Administrador', usuario: 'admin', pinSalt: 'old-salt', pinHash: hash('old-salt1234') };
   const properties = { ADMIN_SESSION_VERSION: '1' }, sessions = new Map(), writes = [];
   let locked = false;
   const context = vm.createContext({
+    Date: Clock,
     PropertiesService: { getScriptProperties: () => ({ getProperty: key => properties[key] ?? null, setProperty: (key, value) => { properties[key] = value; } }) },
     CacheService: { getScriptCache: () => ({ get: key => sessions.get(key) ?? null, put: (key, value) => sessions.set(key, value), remove: key => sessions.delete(key) }) },
     LockService: { getScriptLock: () => ({ waitLock() { assert.equal(locked, false); locked = true; }, releaseLock() { locked = false; } }) },
-    Utilities: { getUuid: randomUUID, sleep() {}, formatDate: () => '2026-11-04T12:00:00-05:00', DigestAlgorithm: { SHA_256: 'sha256' }, Charset: { UTF_8: 'utf8' }, computeDigest: (algorithm, value) => [...createHash(algorithm).update(value).digest()].map(byte => byte > 127 ? byte - 256 : byte) },
+    Utilities: { getUuid: randomUUID, sleep() {}, formatDate: (date, zone, format) => format === 'yyyy-MM-dd' ? new Date(date.getTime() - 5 * 3600000).toISOString().slice(0, 10) : date.toISOString(), DigestAlgorithm: { SHA_256: 'sha256' }, Charset: { UTF_8: 'utf8' }, computeDigest: (algorithm, value) => [...createHash(algorithm).update(value).digest()].map(byte => byte > 127 ? byte - 256 : byte) },
     ContentService: { MimeType: { JSON: 'application/json' }, createTextOutput: value => ({ value, setMimeType() { return this; } }) }
   });
   vm.runInContext(source, context);
@@ -25,7 +28,7 @@ function harness() {
   context.findDataRow_ = () => 2;
   context.setCellByHeader_ = (sheet, row, headers, key, value) => { assert.equal(locked, true); writes.push({ key, value }); admin[key] = value; };
   const login = () => context.adminLogin('1234').token;
-  return { context, admin, properties, sessions, writes, login };
+  return { context, admin, properties, sessions, writes, login, setTime: value => { now = Date.parse(value); } };
 }
 
 test('profile endpoints reject unauthenticated requests and never disclose PIN material', () => {
@@ -109,4 +112,54 @@ test('new actions are exposed by the API and private authentication helpers stay
   assert.equal(call('issueAdminSession_').ok, false);
   assert.equal(call('adminLogout', token).data.ok, true);
   assert.equal(call('getAdminProfile', token).ok, false);
+});
+
+test('sessions expire exactly at midnight in Colombia and cannot authorize an API call on the next day', () => {
+  const h = harness();
+  h.setTime('2026-11-05T04:59:50Z'); // November 4, 23:59:50 in Colombia.
+  const login = h.context.adminLogin('1234');
+  assert.equal(login.expiresAt, Date.parse('2026-11-05T05:00:00Z'));
+  assert.equal(login.expiresIn, 10);
+  h.setTime('2026-11-05T04:59:59.999Z');
+  assert.equal(h.context.getAdminProfile(login.token).admin.id, 'ADM-OWNER');
+  h.setTime('2026-11-05T05:00:00Z');
+  assert.throws(() => h.context.getAdminProfile(login.token), /sesión/);
+  assert.throws(() => h.context.updateAdminProfile(login.token, input), /sesión/);
+  assert.equal(h.context.adminLogin('1234').ok, true);
+});
+
+test('UTC midnight does not end a session prematurely', () => {
+  const h = harness();
+  h.setTime('2026-11-04T23:59:59Z'); // 18:59:59 in Colombia.
+  const login = h.context.adminLogin('1234');
+  assert.equal(login.expiresIn, 18001);
+  h.setTime('2026-11-05T00:00:00Z');
+  assert.equal(h.context.getAdminProfile(login.token).admin.id, 'ADM-OWNER');
+  h.setTime('2026-11-05T05:59:59Z');
+  assert.throws(() => h.context.getAdminProfile(login.token), /sesión/);
+});
+
+test('six-hour expiry is enforced even if a token has not been evicted from the cache', () => {
+  const h = harness(), token = h.login();
+  h.setTime('2026-11-04T23:00:00Z');
+  assert.throws(() => h.context.getAdminProfile(token), /sesión/);
+});
+
+test('legacy, malformed and expired sessions are rejected even if a cached value remains', () => {
+  const h = harness(), token = 'a'.repeat(64);
+  for (const value of ['1', '{', JSON.stringify({ version: '1', day: '2026-11-03', expiresAt: Date.parse('2026-11-06T05:00:00Z') }), JSON.stringify({ version: 'old', day: '2026-11-04', expiresAt: Date.parse('2026-11-05T05:00:00Z') })]) {
+    h.sessions.set('ADMIN_TOKEN_' + token, value);
+    assert.throws(() => h.context.getAdminProfile(token), /sesión/);
+  }
+  assert.throws(() => h.context.getAdminProfile('valid'), /sesión/);
+});
+
+test('repeated wrong PINs are throttled server-side across fresh browser requests', () => {
+  const h = harness();
+  for (let attempt = 0; attempt < 5; attempt++) assert.equal(h.context.adminLogin('0000').ok, false);
+  assert.match(h.context.adminLogin('1234').message, /Demasiados intentos/);
+  h.setTime('2026-11-04T17:05:00Z');
+  assert.equal(h.context.adminLogin('1234').ok, true);
+  assert.equal(h.context.adminLogin('0000').message, 'PIN incorrecto.');
+  assert.equal(h.context.adminLogin('1234').ok, true);
 });

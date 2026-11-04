@@ -38,9 +38,26 @@ publicar la nueva versión, la web muestra que la edición requiere actualizar
   pestañas salen al volver a consultar el servidor.
 - Login y actualización se serializan con el bloqueo del script para impedir
   que una entrada con el PIN anterior compita con su cambio.
-- Cerrar sesión oculta el panel y borra el token local inmediatamente; la
-  revocación remota se solicita en segundo plano. Sin conexión, el token remoto
-  conserva su vencimiento original de seis horas.
+- El token vive exclusivamente en memoria. Cada recarga, nueva pestaña,
+  navegador o dispositivo exige el PIN; no se restaura desde almacenamiento.
+  Al salir se limpian también los datos renderizados y se solicita revocación
+  con `fetch` y `keepalive`, sin depender de que termine para bloquear el panel.
+- La sesión vence al llegar a las **00:00 de Colombia (`America/Bogota`)** o
+  cumplir seis horas, lo que ocurra primero. El servidor valida fecha y
+  vencimiento en cada API administrativa; rechaza tokens antiguos y malformados.
+  El navegador comprueba al volver del fondo, recuperar foco e interactuar.
+  Si una pestaña durmió durante medianoche, vuelve bloqueada. La hora del servidor
+  y el tiempo monotónico evitan prolongar la sesión atrasando el reloj local.
+  Sin conexión al salir, el token remoto conserva ese vencimiento máximo.
+- Cinco intentos de PIN incorrecto bloquean nuevos intentos durante cinco minutos.
+  El contador reside en el servidor y no se reinicia al cambiar de navegador.
+- En PC (desde 1024 px) el perfil usa un modal ancho con datos y seguridad lado
+  a lado; en tabletas y móviles conserva el desplazamiento vertical.
 - La simulación de pagos no intercepta estas APIs ni altera las credenciales.
 
-Pruebas: `tests/admin-account.test.js` y `scripts/check-transfer-browser.mjs`.
+Publicar nuevamente `Code.gs` activa la validación diaria y el límite de intentos
+en el servidor. La web por sí sola ya exige PIN en cada carga, pero no sustituye
+esa validación del backend.
+
+Pruebas: `tests/admin-account.test.js`, `tests/admin-session.test.js` y
+`scripts/check-transfer-browser.mjs`.

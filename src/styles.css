@@ -318,6 +318,19 @@ input:focus, select:focus, textarea:focus { border-color: var(--sky); box-shadow
 .profile-security[open] summary span { transform: rotate(45deg); }
 .profile-feedback { padding: .8rem 1rem; border-radius: 12px; background: #fff0f2; color: #bc3144; font-size: .8rem; }
 .profile-feedback.is-success { color: #13724f; background: #e8f7ef; }
+@media (min-width: 1024px) {
+  .modal.profile-modal { width: min(940px, calc(100vw - 64px)); }
+  .profile-modal .modal__surface { padding: 1.65rem 2rem; }
+  .profile-modal__mark { float: left; margin: 0 1rem 0 0; }
+  .profile-modal .modal__intro { margin: .45rem 0 0; }
+  .profile-fields { display: grid; grid-template-columns: 1.12fr 1fr; align-items: start; gap: 2rem; clear: both; margin-top: 1.5rem; }
+  .profile-fields > .form-grid { margin-top: 0; }
+  .profile-security { margin-top: 0; padding-left: 2rem; border-top: 0; border-left: 1px solid var(--line); }
+  .profile-security summary { min-height: 30px; margin-bottom: .65rem; }
+  .profile-security .form-grid { grid-template-columns: 1fr; margin-top: 0; }
+  .profile-modal label { margin-bottom: .65rem; }
+  .profile-modal input { min-height: 46px; padding-block: .7rem; }
+}
 #refreshAdmin.is-refreshing svg { animation: spin 1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 button, a, summary { touch-action: manipulation; }
