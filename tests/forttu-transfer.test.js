@@ -13,6 +13,7 @@ const requestId = 'request-00000000-0000-0000-000000000001';
 
 function harness({ liveAdapter = true } = {}) {
   const tables = {
+    CLIENTES: [{ id: 'CLI1', documento: '10101010', nombre: 'Cliente de prueba uno' }, { id: 'CLI2', documento: '20202020', nombre: 'Cliente de prueba dos' }],
     CONTRATOS: [{ id: 'C1', clienteId: 'CLI1', estado: 'ACTIVO' }, { id: 'C2', clienteId: 'CLI2', estado: 'ACTIVO' }],
     CARTERA: [
       { id: 'M1', contratoId: 'C1', periodo: 'ENE 2026', valorBase: 100, descuento: 5, cargoExtra: 10, valorPagado: 5, pagoId: '', estado: 'PENDIENTE' },
@@ -81,8 +82,8 @@ function harness({ liveAdapter = true } = {}) {
   if (liveAdapter) context.forttuTransferAdapter_ = () => ({
     ready: true,
     listBankAccounts: () => [clone(account)],
-    reconcileReceipt: (order, blob) => {
-      calls.provider.push({ reference: order.id, hasBlob: Boolean(blob) });
+    reconcileReceipt: (order, blob, context) => {
+      calls.provider.push({ reference: order.id, hasBlob: Boolean(blob), context: clone(context) });
       if (failures.provider) throw new Error('DO NOT EXPOSE remote-secret');
       return modifyResult({ status: resultStatus, reference: order.id, authenticated: true, settled: true,
         accountId: account.id, amountInCents: order.valorCentavos, currency: 'COP',
@@ -315,4 +316,18 @@ test('public API has no simulation, direct reconciliation or new Wompi checkout 
   for (const action of ['simulateTransferVerification', 'createWompiCheckout', 'reconcileForttuTransfers', 'transferReconcileOrder_']) {
     assert.equal(h.context.apiOutput_({ action, args: [] }).ok, false);
   }
+});
+
+test('the future provider receives the server-resolved customer, contract and exact selected months without changing the approval flow', () => {
+  const h = harness(); const order = h.create(); h.submit(order); h.status('VERIFIED');
+  h.context.reconcileForttuTransfers();
+  const payload = h.calls.provider[0].context;
+  assert.equal(payload.reference, order.reference);
+  assert.equal(payload.contractId, 'C1');
+  assert.equal(payload.customer.id, 'CLI1');
+  assert.equal(payload.customer.document, '10101010');
+  assert.equal(payload.expectedPayment.amountInCents, 30000);
+  assert.deepEqual(payload.expectedPayment.months.map(month => month.id), ['M1', 'M2']);
+  assert.equal(h.context.getTransferOrder(order.reference, order.accessToken).success, true);
+  assert.ok(!JSON.stringify(h.context.getTransferOrder(order.reference, order.accessToken)).includes('10101010'));
 });

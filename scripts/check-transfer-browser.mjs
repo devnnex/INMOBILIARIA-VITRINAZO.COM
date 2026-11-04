@@ -77,20 +77,33 @@ try {
       vivienda:{codigo:'PRUEBA-001', tipo:'Apartamento', barrio:'Prueba', direccion:'Dirección de prueba', ciudad:'Bogotá'},
       resumen:{saldo:7315000},
       cartera:[
-        {id:'CAR-DEMO-003',periodo:'MAR 2026',valorBase:2450000,descuento:120000,cargoExtra:0,valorPagado:0,saldo:2330000,estado:'PENDIENTE',fechaVencimiento:'2026-03-10'},
+        {id:'CAR-DEMO-003',periodo:'2026-03-01T00:00:00.000Z',valorBase:2450000,descuento:120000,cargoExtra:0,valorPagado:0,saldo:2330000,estado:'PENDIENTE',fechaVencimiento:'2026-03-10'},
         {id:'CAR-DEMO-004',periodo:'ABR 2026',valorBase:2450000,descuento:0,cargoExtra:85000,valorPagado:0,saldo:2535000,estado:'PENDIENTE',fechaVencimiento:'2026-04-10'},
         {id:'CAR-DEMO-005',periodo:'MAY 2026',valorBase:2450000,descuento:0,cargoExtra:0,valorPagado:0,saldo:2450000,estado:'PENDIENTE',fechaVencimiento:'2026-05-10'}
       ]
     };
+    const clients=[{id:'CLI-PRUEBA-1',nombre:'Persona de prueba',documento:'123456789',estado:'ACTIVO'},{id:'CLI-PRUEBA-2',nombre:'Otro cliente',documento:'987654321',estado:'ACTIVO'}];
+    const contracts=[{id:contract.id,clienteId:clients[0].id,clienteNombre:clients[0].nombre,estado:'ACTIVO',saldo:7315000},{id:'OTRO-CONTRATO',clienteId:clients[1].id,clienteNombre:clients[1].nombre,estado:'ACTIVO',saldo:2000000}];
+    const ledger=contract.cartera.map(row=>({...row,contratoId:contract.id})).concat([{id:'OTRO-MES',contratoId:'OTRO-CONTRATO',periodo:'2026-11-01T00:00:00Z',valorBase:2000000,valorPagado:0,saldo:2000000,estado:'PENDIENTE',fechaVencimiento:'2026-11-10'}]);
+    const versions={clients:1,properties:1,contracts:1,ledger:1,payments:1};
+    const snapshot={version:1,versions,clients,contracts,ledger,payments:[],properties:[],stats:{clientes:2,contratosActivos:2,cartera:9315000,recaudado:0},pageInfo:{}};
+    for(const section of ['clients','properties','contracts','ledger','payments'])snapshot.pageInfo[section]={total:snapshot[section].length,offset:0,nextOffset:snapshot[section].length,limit:1000,hasMore:false};
     window.__backendActions=[];
     const originalFetch=window.fetch;
     window.fetch=function(input, options) {
       if (!String(input).startsWith('https://script.google.com/')) return originalFetch(input,options);
-      const {action}=JSON.parse(options.body); window.__backendActions.push(action);
-      const result=action==='lookupAccount'
+      const {action,args}=JSON.parse(options.body); window.__backendActions.push(action);
+      let result=action==='lookupAccount'
         ? {ok:true,data:{found:true,version:1,contracts:[contract]}}
         : action==='syncAccount' ? {ok:true,data:{changed:false,version:1}}
         : {ok:false,error:'Acción no permitida.'};
+      if(action==='adminLogin')result={ok:true,data:{ok:true,token:'simulation-admin-test'}};
+      if(action==='getAdminDashboard')result={ok:true,data:snapshot};
+      if(action==='getAdminSync')result={ok:true,data:{changed:false,version:1,versions,sections:{}}};
+      if(action==='getClientAccountForAdmin'){
+        const related=contracts.filter(row=>row.clienteId===args[1]);const ids=new Set(related.map(row=>row.id));
+        result={ok:true,data:{client:clients.find(row=>row.id===args[1]),contracts:related,ledger:ledger.filter(row=>ids.has(row.contratoId)),payments:[]}};
+      }
       return Promise.resolve(new Response(JSON.stringify(result),{headers:{'Content-Type':'application/json'}}));
     };
   })()` });
@@ -102,7 +115,7 @@ try {
   await click('#resetPaymentSimulation');
   await resetLoad;
   await wait(`document.getElementById('paymentSimulationHint')?.hidden === false`);
-  await evaluate(`document.getElementById('lookupInput').value='CONTRATO-CUALQUIERA';document.getElementById('lookupForm').requestSubmit()`);
+  await evaluate(`document.getElementById('lookupInput').value='123456789';document.getElementById('lookupForm').requestSubmit()`);
   await wait(`document.querySelector('[data-ledger-check="CAR-DEMO-003"]')`);
   await click('[data-ledger-check="CAR-DEMO-003"]'); await click('[data-ledger-check="CAR-DEMO-004"]');
   assert.match(await evaluate(`document.getElementById('selectedTotal').textContent`), /4.865.000/);
@@ -112,6 +125,8 @@ try {
   await click('.transfer-account-form button');
   await wait(`document.querySelector('.transfer-receipt-form')?.hidden === false`);
   assert.match(await evaluate(`document.querySelector('.transfer-details').textContent`), /CUENTA-DEMO-002/);
+  assert.match(await evaluate(`document.querySelector('.payment-summary__months').textContent`), /Marzo de 2026/);
+  assert.equal(await evaluate(`document.querySelector('.payment-summary__months').textContent.includes('2026-03-01')`), false);
   await screenshot('vitrinazo-transfer-bank');
   const reference = await evaluate(`document.querySelector('.transfer-selection small').textContent`);
   await evaluate(`window.dispatchEvent(new Event('blur')); document.dispatchEvent(new Event('visibilitychange')); window.dispatchEvent(new Event('focus'));`);
@@ -143,6 +158,13 @@ try {
   // A fresh lookup after closing must retain the two simulated paid badges.
   await evaluate(`document.getElementById('lookupForm').requestSubmit()`);
   await wait(`document.querySelector('[data-ledger-id="CAR-DEMO-003"] .badge')?.textContent === 'PAGADO'`);
+  // An admin window opened before the next payment must update from the
+  // storage event, even though the server reports unchanged resource versions.
+  await evaluate(`(()=>{const frame=document.createElement('iframe');frame.id='adminSimulationFrame';frame.src='/admin.html';frame.hidden=true;document.body.appendChild(frame);})()`);
+  await wait(`document.getElementById('adminSimulationFrame')?.contentDocument?.getElementById('adminLoginForm') && document.getElementById('adminSimulationFrame').contentDocument.readyState === 'complete'`);
+  await evaluate(`(()=>{const doc=document.getElementById('adminSimulationFrame').contentDocument;if(doc.getElementById('adminShell').hidden){doc.getElementById('adminPin').value='1234';doc.getElementById('adminLoginForm').requestSubmit();}})()`);
+  await wait(`document.getElementById('adminSimulationFrame').contentDocument.getElementById('adminShell').hidden === false`);
+  await wait(`document.getElementById('adminSimulationFrame').contentDocument.getElementById('statGrid').textContent.includes('4.450.000')`);
   await click('[data-ledger-check="CAR-DEMO-005"]'); await click('#openPayment');
   await wait(`document.querySelector('.transfer-account-form')?.hidden === false`);
   await click('.transfer-account-form button');
@@ -157,6 +179,7 @@ try {
   await upload();
   await wait(`document.querySelector('.transfer-success')?.hidden === false`);
   await wait(`document.querySelector('[data-ledger-id="CAR-DEMO-005"]')?.classList.contains('is-paid')`);
+  await wait(`document.getElementById('adminSimulationFrame').contentDocument.getElementById('statGrid').textContent.includes('2.000.000')`);
   await cdp('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
   const layout = await evaluate(`(()=>{const dialog=document.querySelector('.transfer-modal');const surface=dialog.querySelector('.modal__surface');return {width:dialog.getBoundingClientRect().width,overflow:surface.scrollWidth>surface.clientWidth};})()`);
   assert.ok(layout.width <= 390); assert.equal(layout.overflow, false);
@@ -164,6 +187,24 @@ try {
   assert.equal(requests.filter(url => url.includes('script.google.com') || url.includes('script.googleusercontent.com')).length, 0);
   assert.equal(await evaluate(`location.search`), '');
   assert.equal(await evaluate(`window.__backendActions.some(action=> !['lookupAccount','syncAccount'].includes(action))`), false);
+  const adminLoad = waitForLoad();
+  await cdp('Page.navigate', { url: 'http://127.0.0.1:5178/admin.html' });
+  await adminLoad;
+  await wait(`document.getElementById('adminShell')?.hidden === false`);
+  await wait(`document.querySelectorAll('#paymentsTable [data-payment-id]').length === 2`);
+  assert.match(await evaluate(`document.getElementById('statGrid').textContent`), /2.000.000/);
+  assert.match(await evaluate(`document.getElementById('paymentsTable').textContent`), /Marzo de 2026/);
+  assert.match(await evaluate(`document.getElementById('paymentsTable').textContent`), /Persona de prueba/);
+  await click('[data-client-account="CLI-PRUEBA-1"]');
+  await wait(`document.querySelectorAll('#clientAccountMonths .badge--paid').length === 3`);
+  assert.match(await evaluate(`document.getElementById('clientAccountMonths').textContent`), /Marzo de 2026/);
+  assert.equal(await evaluate(`document.getElementById('clientAccountMonths').textContent.includes('2026-03-01T')`), false);
+  await cdp('Emulation.setDeviceMetricsOverride', { width: 1280, height: 1000, deviceScaleFactor: 1, mobile: false });
+  await screenshot('vitrinazo-admin-simulated-account');
+  await click('#clientAccountDialog [data-dialog-close]');
+  await click('[data-view="payments"]');
+  await screenshot('vitrinazo-admin-simulated-payments');
+  assert.equal(await evaluate(`window.__backendActions.some(action=> !['adminLogin','getAdminDashboard','getAdminSync','getClientAccountForAdmin'].includes(action))`), false);
   assert.deepEqual(errors, []);
-  console.log('PASS: Spanish upload, invalid-file rejection, automatic submission and approval, confetti, paid badges, reload recovery, second payment, mobile width, zero production payment API requests.');
+  console.log('PASS: automatic payment, Spanish months, customer identity, live admin updates, lower balances, scoped paid badges and history, reload recovery, invalid files, mobile layout, zero production payment writes.');
 } finally { socket.close(); }

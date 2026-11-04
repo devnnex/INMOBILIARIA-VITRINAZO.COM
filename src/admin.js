@@ -1,4 +1,4 @@
-import { Backend, formatMoney, formatDate, escapeHtml, initials, debounce, showToast, setBusy, setPageLoader } from './common.js';
+import { Backend, formatMoney, formatDate, formatRentalMonth, formatPaymentMethod, escapeHtml, initials, debounce, showToast, setBusy, setPageLoader } from './common.js';
 
 'use strict';
 
@@ -174,7 +174,8 @@ function applySectionPage(section, page, replace) {
     offset: page.offset,
     nextOffset: page.nextOffset,
     hasMore: page.hasMore,
-    limit: page.limit
+    limit: page.limit,
+    __simulationBaseTotal: page.__simulationBaseTotal
   };
 }
 
@@ -382,9 +383,22 @@ if (state.channel) {
 }
 window.addEventListener('storage', function (event) {
   if (event.key === 'vitrinazo-admin-change') scheduleSync(100);
+  if (event.key === 'vitrinazo-transfer-simulation-v1') {
+    try {
+      if (JSON.parse(event.newValue || '{}').version !== JSON.parse(event.oldValue || '{}').version) refreshSimulatedPayments();
+    } catch (error) { refreshSimulatedPayments(); }
+  }
 });
+window.addEventListener('vitrinazo-transfer-change', refreshSimulatedPayments);
+
+function refreshSimulatedPayments() {
+  if (!state.data || !Backend.isTransferSimulation) return;
+  state.data = Backend.projectAdminSimulation(state.data);
+  state.pageInfo = state.data.pageInfo || state.pageInfo;
+  renderStats(); renderRecentContracts(); renderContracts(); renderPayments(); renderManualContracts(); renderClientAccount();
+}
 document.addEventListener('visibilitychange', function () { scheduleSync(document.hidden ? 90000 : 150); });
-window.addEventListener('focus', function () { scheduleSync(100); });
+window.addEventListener('focus', function () { refreshSimulatedPayments(); scheduleSync(100); });
 
 function renderAll() {
   state.rendered = {};
@@ -478,7 +492,7 @@ function renderLedger() {
   if (!table) return;
   table.innerHTML = state.data.ledger.map(function (item) {
     const adjustments = Number(item.cargoExtra || 0) - Number(item.descuento || 0);
-    return '<tr><td><strong>' + escapeHtml(item.contratoId) + '</strong><small>' + escapeHtml(item.clienteNombre || '') + '</small></td><td>' + escapeHtml(item.periodo) + '<small>' + formatDate(item.fechaVencimiento) + '</small></td><td>' + formatMoney(item.valorBase) + '</td><td class="' + (adjustments < 0 ? 'positive' : '') + '">' + (adjustments === 0 ? '—' : (adjustments > 0 ? '+' : '') + formatMoney(adjustments)) + '<small>' + escapeHtml(item.observacion || '') + '</small></td><td><strong>' + formatMoney(item.saldo) + '</strong></td><td><span class="badge ' + badgeClass(item.estadoCalculado) + '">' + escapeHtml(item.estadoCalculado) + '</span></td><td><button class="row-action" data-adjust="' + escapeHtml(item.id) + '" title="Cambiar el valor del mes">✎</button></td></tr>';
+    return '<tr><td><strong>' + escapeHtml(item.contratoId) + '</strong><small>' + escapeHtml(item.clienteNombre || '') + '</small></td><td>' + escapeHtml(formatRentalMonth(item.periodo, item.fechaVencimiento)) + '<small>' + formatDate(item.fechaVencimiento) + '</small></td><td>' + formatMoney(item.valorBase) + '</td><td class="' + (adjustments < 0 ? 'positive' : '') + '">' + (adjustments === 0 ? '—' : (adjustments > 0 ? '+' : '') + formatMoney(adjustments)) + '<small>' + escapeHtml(item.observacion || '') + '</small></td><td><strong>' + formatMoney(item.saldo) + '</strong></td><td><span class="badge ' + badgeClass(item.estadoCalculado) + '">' + escapeHtml(item.estadoCalculado) + '</span></td><td><button class="row-action" data-adjust="' + escapeHtml(item.id) + '" title="Cambiar el valor del mes">✎</button></td></tr>';
   }).join('') || emptyRow(7, 'No hay cobros creados.');
   labelTableCells('ledgerTable');
   document.querySelectorAll('[data-adjust]').forEach(function (button) { button.addEventListener('click', function () { openAdjust(button.dataset.adjust); }); });
@@ -491,12 +505,21 @@ function renderPayments() {
     const editable = isEditableManualPayment(payment);
     const actions = editable ? rowActions('payment', payment.id) : '<span class="protected-record" title="Los pagos bancarios se conservan como historial">Protegido</span>';
     const reference = String(payment.id || '').indexOf('TEMP-') === 0 ? 'Pago reciente' : payment.referencia;
-    return '<tr data-status="' + escapeHtml(payment.estado) + '"><td><strong>' + escapeHtml(reference) + '</strong><small>' + escapeHtml(payment.transaccionId || 'Pago agregado aquí') + '</small></td><td>' + escapeHtml(payment.contratoId) + '</td><td><strong>' + formatMoney(payment.valor) + '</strong></td><td>' + escapeHtml(String(payment.metodo || '').replace('_WOMPI', '')) + '</td><td>' + formatDate(payment.pagadoEn || payment.creadoEn) + '</td><td><span class="badge ' + (payment.estado === 'APROBADO' ? 'badge--paid' : payment.estado === 'PENDIENTE' ? 'badge--pending' : 'badge--overdue') + '">' + escapeHtml(payment.estado) + '</span></td><td>' + actions + '</td></tr>';
+    const contract = state.data.contracts.find(item => item.id === payment.contratoId);
+    return '<tr data-payment-id="' + escapeHtml(payment.id) + '" data-status="' + escapeHtml(payment.estado) + '"><td><strong>' + escapeHtml(reference) + '</strong><small>' + escapeHtml(payment.transaccionId || 'Pago agregado aquí') + '</small></td><td>' + escapeHtml(payment.contratoId) + '<small>' + escapeHtml(payment.clienteNombre || contract?.clienteNombre || '') + '</small></td><td><strong>' + formatMoney(payment.valor) + '</strong><small class="payment-month-labels">' + escapeHtml(paymentMonthLabels(payment)) + '</small></td><td>' + escapeHtml(formatPaymentMethod(payment.metodo)) + '</td><td>' + formatDate(payment.pagadoEn || payment.creadoEn) + '</td><td><span class="badge ' + (payment.estado === 'APROBADO' ? 'badge--paid' : payment.estado === 'PENDIENTE' ? 'badge--pending' : 'badge--overdue') + '">' + escapeHtml(payment.estado) + '</span></td><td>' + actions + '</td></tr>';
   }).join('') || emptyRow(7, 'No hay pagos registrados.');
   labelTableCells('paymentsTable');
   applyTableFilters('payments');
   renderPagination('payments');
   state.rendered.payments = true;
+}
+
+function paymentMonthLabels(payment) {
+  if (Array.isArray(payment.meses)) return payment.meses.map(month => formatRentalMonth(month)).join(' · ');
+  return parsePaymentAllocations(payment).map(function (allocation) {
+    const row = state.data.ledger.find(item => item.id === allocation.id && item.contratoId === payment.contratoId);
+    return row ? formatRentalMonth(row.periodo, row.fechaVencimiento) : '';
+  }).filter(Boolean).join(' · ');
 }
 
 function renderPagination(section) {
@@ -614,27 +637,11 @@ function renderClientAccount() {
     const discount = Number(item.descuento || 0);
     const extra = Number(item.cargoExtra || 0);
     const changes = [discount ? '−' + formatMoney(discount) + ' de descuento' : '', extra ? '+' + formatMoney(extra) + ' adicional' : ''].filter(Boolean).join(' · ') || 'Sin cambios al valor';
-    return '<article class="account-month"><div><strong>' + escapeHtml(formatRentalMonth(item.periodo, item.fechaVencimiento)) + '</strong><small>Pago límite: ' + formatDate(item.fechaVencimiento) + '</small><span class="account-month__changes">' + escapeHtml(changes) + '</span></div><div class="account-month__amount"><span>Falta por pagar</span><strong>' + formatMoney(item.saldo) + '</strong></div><button class="row-action" type="button" data-adjust="' + escapeHtml(item.id) + '"><span aria-hidden="true">✎</span><b>Cambiar valor</b></button></article>';
+    return '<article class="account-month' + (Number(item.saldo) <= 0 ? ' is-paid' : '') + '" data-ledger-id="' + escapeHtml(item.id) + '"><div><strong>' + escapeHtml(formatRentalMonth(item.periodo, item.fechaVencimiento)) + '</strong><small>Pago límite: ' + formatDate(item.fechaVencimiento) + '</small><span class="account-month__changes">' + escapeHtml(changes) + '</span></div><div class="account-month__amount"><span>Falta por pagar</span><strong>' + formatMoney(item.saldo) + '</strong><span class="badge ' + badgeClass(item.estadoCalculado) + '">' + escapeHtml(item.estadoCalculado) + '</span></div><button class="row-action" type="button" data-adjust="' + escapeHtml(item.id) + '"><span aria-hidden="true">✎</span><b>Cambiar valor</b></button></article>';
   }).join('') : '<p class="client-account__empty">No hay meses registrados para este contrato.</p>';
   document.getElementById('clientAccountPayments').innerHTML = payments.length ? payments.map(function (payment) {
-    return '<article class="account-payment"><div><strong>' + escapeHtml(payment.referencia || payment.id) + '</strong><small>' + formatDate(payment.pagadoEn || payment.creadoEn) + ' · ' + escapeHtml(String(payment.metodo || '').replace('_WOMPI', '')) + '</small></div><strong>' + formatMoney(payment.valor) + '</strong></article>';
+    return '<article class="account-payment"><div><strong>' + escapeHtml(payment.referencia || payment.id) + '</strong><small>' + formatDate(payment.pagadoEn || payment.creadoEn) + ' · ' + escapeHtml(formatPaymentMethod(payment.metodo)) + '</small><small class="payment-month-labels">' + escapeHtml(paymentMonthLabels(payment)) + '</small></div><strong>' + formatMoney(payment.valor) + '</strong></article>';
   }).join('') : '<p class="client-account__empty">Todavía no hay pagos registrados para este contrato.</p>';
-}
-
-function formatRentalMonth(period, dueDate) {
-  const monthNames = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
-  const sources = [dueDate, period];
-  for (let index = 0; index < sources.length; index += 1) {
-    const match = String(sources[index] || '').match(/^(\d{4})-(\d{2})/);
-    if (match) {
-      const month = Number(match[2]);
-      if (month >= 1 && month <= 12) return monthNames[month - 1] + ' de ' + match[1];
-    }
-  }
-  const shortMonths = { ENE: 0, FEB: 1, MAR: 2, ABR: 3, MAY: 4, JUN: 5, JUL: 6, AGO: 7, SEP: 8, OCT: 9, NOV: 10, DIC: 11 };
-  const shortMatch = String(period || '').trim().toUpperCase().match(/^([A-Z]{3})\s+(\d{4})$/);
-  if (shortMatch && shortMonths[shortMatch[1]] !== undefined) return monthNames[shortMonths[shortMatch[1]]] + ' de ' + shortMatch[2];
-  return String(period || 'Mes del arriendo');
 }
 
 clientAccountDialog.addEventListener('close', function () {
@@ -1207,7 +1214,7 @@ function openAdjust(id) {
   setCurrencyInputValue(adjustForm.elements.descuento, item.descuento || 0);
   setCurrencyInputValue(adjustForm.elements.cargoExtra, item.cargoExtra || 0);
   adjustForm.elements.observacion.value = item.observacion || '';
-  document.getElementById('adjustTitle').textContent = item.periodo + ' · ' + item.contratoId;
+  document.getElementById('adjustTitle').textContent = formatRentalMonth(item.periodo, item.fechaVencimiento) + ' · ' + item.contratoId;
   adjustDialog.showModal();
 }
 
@@ -1307,7 +1314,7 @@ function renderManualLedgerOptions(id, preservePaymentValue) {
   state.manualLedger.forEach(function (item) { item.availableForEdit = Number(item.saldo || 0) + Number(oldById[item.id] || 0); });
   const items = state.manualLedger.filter(function (item) { return item.availableForEdit > 0; });
   picker.innerHTML = items.length ? items.map(function (item) {
-    return '<label class="month-option"><input type="checkbox" name="ledgerIds" value="' + escapeHtml(item.id) + '"' + (oldById[item.id] ? ' checked' : '') + '><span>' + escapeHtml(item.periodo) + '</span><strong>' + formatMoney(item.availableForEdit) + '</strong></label>';
+    return '<label class="month-option"><input type="checkbox" name="ledgerIds" value="' + escapeHtml(item.id) + '"' + (oldById[item.id] ? ' checked' : '') + '><span>' + escapeHtml(formatRentalMonth(item.periodo, item.fechaVencimiento)) + '</span><strong>' + formatMoney(item.availableForEdit) + '</strong></label>';
   }).join('') : '<p>Este contrato no tiene pagos pendientes.</p>';
   picker.querySelectorAll('input').forEach(function (input) { input.addEventListener('change', syncManualTotal); });
   if (preservePaymentValue && state.manualEditingPayment && state.manualEditingPayment.contratoId === id) setCurrencyInputValue(manualForm.elements.valor, state.manualEditingPayment.valor);

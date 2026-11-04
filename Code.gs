@@ -1477,7 +1477,7 @@ function forttuTransferAdapter_() {
   return {
     ready: false,
     listBankAccounts: function (contract) { throw new Error('Pendiente adaptar las cuentas bancarias de Forttu.'); },
-    reconcileReceipt: function (order, receiptBlob) { throw new Error('Pendiente adaptar el envío y la verificación de Forttu.'); }
+    reconcileReceipt: function (order, receiptBlob, context) { throw new Error('Pendiente adaptar el envío y la verificación de Forttu.'); }
   };
 }
 
@@ -1716,6 +1716,21 @@ function reconcileForttuTransfers() {
 }
 
 /** Procesamiento común para la consulta del cliente y la tarea en segundo plano. */
+function transferProviderContext_(order) {
+  const db = getDb_();
+  const contract = getRowsByValue_(db.getSheetByName(APP.sheets.contracts), 'id', order.contratoId)[0];
+  const client = getRowsByValue_(db.getSheetByName(APP.sheets.clients), 'id', order.clienteId)[0];
+  if (!contract || !client || contract.clienteId !== order.clienteId) throw new Error('El cliente de la solicitud no coincide con el contrato.');
+  return {
+    reference: order.id, contractId: order.contratoId,
+    customer: { id: client.id, document: String(client.documento || ''), fullName: String(client.nombre || '') },
+    expectedPayment: { amountInCents: Number(order.valorCentavos), currency: order.moneda,
+      accountId: JSON.parse(order.cuentaJson).id,
+      months: JSON.parse(order.asignacionesJson).map(function (item) { return { id: item.id, period: item.period, amountInCents: item.amountCents }; })
+    }
+  };
+}
+
 function transferReconcileOrder_(reference, interactive) {
   return withScriptLock_(function () {
       const order = getRowsByValue_(getDb_().getSheetByName(APP.sheets.transfers), 'id', reference)[0];
@@ -1725,7 +1740,7 @@ function transferReconcileOrder_(reference, interactive) {
       try {
         if (order.estado === 'PENDIENTE_VERIFICACION') {
           const receipt = DriveApp.getFileById(order.comprobanteId).getBlob();
-          const result = transferAdapter_().reconcileReceipt(order, receipt);
+          const result = transferAdapter_().reconcileReceipt(order, receipt, transferProviderContext_(order));
           if (!result || result.authenticated !== true || result.reference !== order.id) throw new Error('Untrusted response');
           if (result.status === 'PENDING') { order.ultimoError = ''; transferSaveOrder_(order); return; }
           if (result.status === 'REJECTED') { order.estado = 'RECHAZADO'; order.ultimoError = ''; transferSaveOrder_(order); return; }

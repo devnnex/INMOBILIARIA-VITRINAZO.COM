@@ -14,6 +14,24 @@
     const date = new Date(String(value).length === 10 ? value + 'T12:00:00' : value);
     return Number.isNaN(date.getTime()) ? value : dateFormatter.format(date);
   }
+  function formatRentalMonth(period, dueDate) {
+    const names = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+    const short = ['ENE', 'FEB', 'MAR', 'ABR', 'MAY', 'JUN', 'JUL', 'AGO', 'SEP', 'OCT', 'NOV', 'DIC'];
+    for (const value of [period, dueDate]) {
+      const text = String(value || '').trim();
+      const iso = text.match(/^(\d{4})-(\d{2})(?:\D|$)/);
+      if (iso && Number(iso[2]) >= 1 && Number(iso[2]) <= 12) return names[Number(iso[2]) - 1] + ' de ' + iso[1];
+      const words = text.replace(/\./g, '').toUpperCase().match(/^([A-ZÁÉÍÓÚ]+)\s+(?:DE\s+)?(\d{4})$/);
+      if (words) {
+        const month = short.findIndex((name, index) => name === words[1] || names[index].toUpperCase() === words[1]);
+        if (month !== -1) return names[month] + ' de ' + words[2];
+      }
+    }
+    return String(period || 'Mes del arriendo');
+  }
+  function formatPaymentMethod(value) {
+    return ({ TRANSFERENCIA_SIMULADA: 'Transferencia · prueba', TRANSFERENCIA_FORTTU: 'Transferencia bancaria', TRANSFERENCIA: 'Transferencia', EFECTIVO: 'Efectivo', CONSIGNACION: 'Consignación' })[value] || String(value || '').replace('_WOMPI', '');
+  }
   function escapeHtml(value) {
     return String(value == null ? '' : value).replace(/[&<>'"]/g, function (character) {
       return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#039;', '"': '&quot;' })[character];
@@ -228,7 +246,7 @@
       if (database.transfers.some(order => order.contractId === contractId && order.status !== 'RECHAZADO' && order.months.some(month => ledgerIds.includes(month.id)))) throw new Error('Hay una solicitud para estos meses. Revisa tu transferencia.');
       const months = rows.map(row => ({ id: row.id, period: row.periodo, amountInCents: Math.round(enrich(row).saldo * 100), beforePaidCents: Math.round(Number(row.valorPagado || 0) * 100) }));
       const order = { reference: 'TRF-DEMO-' + crypto.randomUUID(), accessToken: crypto.randomUUID(), requestId,
-        contractId, account, months, amountInCents: months.reduce((sum, month) => sum + month.amountInCents, 0),
+        contractId, customer: structuredClone(database.contracts.find(item => item.id === contractId)?.customer || {}), account, months, amountInCents: months.reduce((sum, month) => sum + month.amountInCents, 0),
         currency: 'COP', status: 'ESPERANDO_COMPROBANTE', receiptUploaded: false, success: false, demo: true };
       database.transfers.push(order); persist();
       return structuredClone(order);
@@ -267,7 +285,7 @@
         if (rows.some((row, index) => !row || Math.round(enrich(row).saldo * 100) !== order.months[index].amountInCents)) order.status = 'EN_REVISION';
         else {
           rows.forEach((row, index) => { row.valorPagado = Number(row.valorPagado || 0) + order.months[index].amountInCents / 100; row.estado = 'PAGADO'; row.pagoId = 'PAG-' + reference; });
-          database.payments.push({ id: 'PAG-' + reference, contratoId: order.contractId, valor: order.amountInCents / 100,
+          database.payments.push({ id: 'PAG-' + reference, contratoId: order.contractId, clienteId: order.customer?.id || '', clienteNombre: order.customer?.name || '', valor: order.amountInCents / 100,
             metodo: 'TRANSFERENCIA_FORTTU', estado: 'APROBADO', referencia: reference, transaccionId: 'TX-' + reference,
             detalleJson: JSON.stringify(order.months.map(month => ({ id: month.id, amount: month.amountInCents / 100 }))),
             creadoEn: new Date().toISOString(), pagadoEn: new Date().toISOString(), nota: 'Simulación local, sin pago real' });
@@ -335,15 +353,35 @@
     } catch (error) { /* comenzar con una simulación limpia */ }
     return { version: 1, contracts: [], ledger: [], transfers: [], payments: [] };
   }());
-  function persistSimulation() { localStorage.setItem(SIMULATION_STORAGE_KEY, JSON.stringify(simulationDb)); }
+  function reloadSimulation() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(SIMULATION_STORAGE_KEY) || 'null');
+      if (saved && ['contracts', 'ledger', 'transfers', 'payments'].every(key => Array.isArray(saved[key]))) Object.assign(simulationDb, saved);
+    } catch (error) { /* conservar la última lectura válida */ }
+  }
+  function persistSimulation() {
+    const previous = localStorage.getItem(SIMULATION_STORAGE_KEY);
+    const value = JSON.stringify(simulationDb);
+    if (previous === value) return;
+    localStorage.setItem(SIMULATION_STORAGE_KEY, value);
+    let previousVersion = 0;
+    try { previousVersion = Number(JSON.parse(previous || '{}').version || 0); } catch (error) { /* primera escritura */ }
+    if (previousVersion !== Number(simulationDb.version || 0) && typeof window.dispatchEvent === 'function') window.dispatchEvent(new window.Event('vitrinazo-transfer-change'));
+  }
   const simulatedTransfers = createTransferSimulation(simulationDb, persistSimulation);
 
   // La consulta sigue utilizando el backend existente. Los abonos de prueba se
   // proyectan únicamente sobre la vista local, sin escribir en la cartera real.
   function captureSimulationContract(contract) {
     if (!contract || !Array.isArray(contract.cartera)) return contract;
+    reloadSimulation();
     const index = simulationDb.contracts.findIndex(item => item.id === contract.id);
-    const snapshot = { id: contract.id, estado: contract.estado || 'ACTIVO' };
+    const previous = simulationDb.contracts[index] || {};
+    const snapshot = { ...previous, id: contract.id, estado: contract.estado || 'ACTIVO', customer: {
+      ...previous.customer, id: contract.clienteId || contract.cliente?.id || previous.customer?.id || '',
+      name: contract.cliente?.nombre || previous.customer?.name || '',
+      document: contract.cliente?.documento || previous.customer?.document || ''
+    } };
     if (index === -1) simulationDb.contracts.push(snapshot);
     else simulationDb.contracts[index] = snapshot;
     const rows = contract.cartera.map(item => ({ ...item, contratoId: contract.id }));
@@ -365,8 +403,116 @@
       pendientes: ledger.filter(row => row.saldo > 0).length
     } };
   }
-  function applyPaymentSimulation(result) {
+  function originalSimulationRow(row) {
+    const base = { ...row, ...row.__simulationBase };
+    delete base.__simulationBase;
+    delete base.__simulation;
+    // Compatibilidad con pruebas guardadas antes de compartirlas con admin.
+    if (!row.__simulationBase) {
+      const order = simulationDb.transfers.find(item => item.status === 'APROBADO' && item.contractId === row.contratoId && 'PAG-' + item.reference === row.pagoId);
+      const month = order?.months.find(item => item.id === row.id);
+      if (month && Math.round(Number(row.valorPagado || 0) * 100) === month.beforePaidCents + month.amountInCents) {
+        base.valorPagado = month.beforePaidCents / 100; base.pagoId = ''; base.estado = 'PENDIENTE';
+      }
+    }
+    return enrich(base);
+  }
+  function activeSimulationOrders() {
+    return simulationDb.transfers.filter(order => order.status === 'APROBADO' && order.success === true && order.months.every(function (month) {
+      const saved = simulationDb.ledger.find(row => row.id === month.id && row.contratoId === order.contractId);
+      if (!saved) return false;
+      const row = originalSimulationRow(saved);
+      return Math.round(Number(row.valorPagado || 0) * 100) === month.beforePaidCents && Math.round(row.saldo * 100) === month.amountInCents;
+    }));
+  }
+  function simulationLedgerView(row, orders) {
+    const base = originalSimulationRow(row);
+    const order = orders.find(item => item.contractId === base.contratoId && item.months.some(month => month.id === base.id));
+    const month = order?.months.find(item => item.id === base.id);
+    if (!month) return base;
+    return enrich({ ...base, valorPagado: (month.beforePaidCents + month.amountInCents) / 100,
+      estado: 'PAGADO', pagoId: 'PAG-' + order.reference, __simulation: true,
+      __simulationBase: { valorPagado: base.valorPagado, estado: base.estado, pagoId: base.pagoId }
+    });
+  }
+  function rememberAdminLedger(rows, contractId) {
+    (rows || []).forEach(function (row) {
+      const base = originalSimulationRow({ ...row, contratoId: row.contratoId || contractId });
+      const index = simulationDb.ledger.findIndex(item => item.id === base.id && item.contratoId === base.contratoId);
+      if (index === -1) simulationDb.ledger.push(base);
+      else simulationDb.ledger[index] = base;
+    });
+    persistSimulation();
+  }
+  function simulationPageInfo(section, page, items) {
+    const localCount = section === 'payments' ? items.filter(item => item.__simulation).length : 0;
+    const total = Number(page.__simulationBaseTotal ?? page.total ?? 0);
+    return { ...page, items, total: total + localCount, __simulationBaseTotal: total };
+  }
+  function projectAdminPage(section, page) {
+    const projected = projectAdminSimulation({ [section]: page.items });
+    return simulationPageInfo(section, page, projected[section]);
+  }
+  function projectAdminSimulation(data) {
+    reloadSimulation();
+    if (Array.isArray(data.ledger)) rememberAdminLedger(data.ledger);
+    const contracts = data.contracts || [];
+    contracts.forEach(function (contract) {
+      const snapshot = simulationDb.contracts.find(item => item.id === contract.id);
+      const customer = (data.clients || []).find(item => item.id === contract.clienteId) || (data.client?.id === contract.clienteId ? data.client : null);
+      if (snapshot) snapshot.customer = { ...snapshot.customer, id: contract.clienteId || snapshot.customer?.id || '', name: customer?.nombre || contract.clienteNombre || snapshot.customer?.name || '' };
+    });
+    persistSimulation();
+    const orders = activeSimulationOrders();
+    const amounts = {};
+    orders.forEach(order => { amounts[order.contractId] = Number(amounts[order.contractId] || 0) + order.amountInCents / 100; });
+    const result = { ...data };
+    if (Array.isArray(data.ledger)) result.ledger = data.ledger.map(row => simulationLedgerView(row, orders));
+    if (Array.isArray(data.contracts)) result.contracts = contracts.map(function (contract) {
+      const original = Number(contract.__simulationSaldo ?? contract.saldo ?? 0);
+      return { ...contract, saldo: Math.max(0, original - Number(amounts[contract.id] || 0)), __simulationSaldo: original };
+    });
+    if (data.stats) {
+      const original = data.stats.__simulationBase || { cartera: Number(data.stats.cartera || 0), recaudado: Number(data.stats.recaudado || 0) };
+      const amount = orders.reduce((sum, order) => sum + order.amountInCents / 100, 0);
+      result.stats = { ...data.stats, cartera: Math.max(0, original.cartera - amount), recaudado: original.recaudado + amount, __simulationBase: original };
+    }
+    if (Array.isArray(data.payments)) {
+      const real = data.payments.filter(payment => !payment.__simulation);
+      const existing = new Set(real.map(payment => payment.referencia));
+      const scope = data.client ? new Set(contracts.map(contract => contract.id)) : null;
+      const payments = orders.filter(order => (!scope || scope.has(order.contractId)) && !existing.has(order.reference)).map(function (order) {
+        const payment = simulationDb.payments.find(item => item.referencia === order.reference);
+        const contract = contracts.find(item => item.id === order.contractId);
+        const customer = simulationDb.contracts.find(item => item.id === order.contractId)?.customer || order.customer || {};
+        return { ...payment, id: payment?.id || 'PAG-' + order.reference, referencia: order.reference,
+          contratoId: order.contractId, clienteId: contract?.clienteId || customer.id || '', clienteNombre: contract?.clienteNombre || customer.name || '',
+          valor: order.amountInCents / 100, estado: 'APROBADO', metodo: 'TRANSFERENCIA_SIMULADA',
+          meses: order.months.map(month => month.period), __simulation: true
+        };
+      });
+      result.payments = payments.concat(real);
+      if (data.pageInfo?.payments) result.pageInfo = { ...data.pageInfo, payments: simulationPageInfo('payments', data.pageInfo.payments, result.payments) };
+    }
+    return result;
+  }
+  function applyPaymentSimulation(result, method, args) {
     if (!TRANSFER_SIMULATION_ENABLED || !result || typeof result !== 'object') return result;
+    reloadSimulation();
+    if (method === 'getAdminDashboard' || method === 'getClientAccountForAdmin') return projectAdminSimulation(result);
+    if (method === 'getContractLedgerForAdmin' && Array.isArray(result)) {
+      rememberAdminLedger(result, args[1]);
+      return result.map(row => simulationLedgerView(row, activeSimulationOrders()));
+    }
+    if (method === 'getAdminPage') return { ...result, page: projectAdminPage(result.section || args[1], result.page) };
+    if (method === 'getAdminSync' && result.changed) {
+      const snapshot = { stats: result.stats };
+      Object.entries(result.sections || {}).forEach(([section, page]) => { snapshot[section] = page.items; });
+      const projected = projectAdminSimulation(snapshot);
+      const sections = {};
+      Object.entries(result.sections || {}).forEach(([section, page]) => { sections[section] = simulationPageInfo(section, page, projected[section]); });
+      return { ...result, stats: projected.stats, sections };
+    }
     if (Array.isArray(result.contracts)) return { ...result, contracts: result.contracts.map(captureSimulationContract) };
     if (result.contract) return { ...result, contract: captureSimulationContract(result.contract) };
     return result;
@@ -380,15 +526,18 @@
     prepareTransferSimulation: function (contract) {
       return !DEMO_MODE && TRANSFER_SIMULATION_ENABLED ? captureSimulationContract(contract) : contract;
     },
+    projectAdminSimulation: function (data) { return !DEMO_MODE && TRANSFER_SIMULATION_ENABLED ? projectAdminSimulation(data) : data; },
     resetTransferSimulation: function () {
+      reloadSimulation();
       simulationDb.contracts = []; simulationDb.ledger = []; simulationDb.transfers = []; simulationDb.payments = [];
+      simulationDb.version = Number(simulationDb.version || 0) + 1;
       persistSimulation();
     },
     call: function (method) {
       const args = Array.prototype.slice.call(arguments, 1);
       if (!DEMO_MODE && TRANSFER_SIMULATION_ENABLED && Object.prototype.hasOwnProperty.call(simulatedTransfers, method)) {
         return new Promise(function (resolve, reject) {
-          setTimeout(function () { try { resolve(simulatedTransfers[method].apply(simulatedTransfers, args)); } catch (error) { reject(error); } }, 180);
+          setTimeout(function () { try { reloadSimulation(); resolve(simulatedTransfers[method].apply(simulatedTransfers, args)); } catch (error) { reject(error); } }, 180);
         });
       }
       if (!DEMO_MODE) {
@@ -402,7 +551,7 @@
           return response.json();
         }).then(function (payload) {
           if (!payload || payload.ok !== true) throw new Error(payload && payload.error ? payload.error : 'Respuesta inválida del servidor.');
-          return applyPaymentSimulation(payload.data);
+          return applyPaymentSimulation(payload.data, method, args);
         }).catch(function (error) {
           if (error instanceof SyntaxError) throw new Error('La URL de Apps Script no devolvió JSON. Actualiza el despliegue del backend.');
           throw error;
@@ -437,4 +586,4 @@
 
 applyAssets();
 
-export { Backend, formatMoney, formatDate, escapeHtml, initials, debounce, showToast, setBusy, setPageLoader };
+export { Backend, formatMoney, formatDate, formatRentalMonth, formatPaymentMethod, escapeHtml, initials, debounce, showToast, setBusy, setPageLoader };

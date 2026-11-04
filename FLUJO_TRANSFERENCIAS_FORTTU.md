@@ -60,9 +60,11 @@ Debe consultar las cuentas de Forttu autorizadas para el contrato. Devuelve una 
 
 Estos son nombres **internos de Vitrinazo**, no nombres confirmados de la API externa. El adaptador traduce los campos reales. Los números de cuenta e identificaciones deben conservarse como texto.
 
-### `reconcileReceipt(order, receiptBlob)`
+### `reconcileReceipt(order, receiptBlob, context)`
 
 Recibe una solicitud persistida y el archivo privado. Debe enviar el archivo según el protocolo real, consultar el resultado y resolver reintentos usando `order.id` como referencia e idempotencia. Si la API devuelve un identificador de envío necesario para consultas posteriores, persistirlo de forma recuperable; no depender de memoria de ejecución. Un timeout no autoriza reenviar como si fuera otro pago.
+
+El tercer argumento lo prepara `transferProviderContext_` con el cliente y cédula resueltos en el servidor, contrato, referencia, cuenta y cantidad exacta por mes y total. Su formato interno y la decisión de conservar la misma experiencia al conectar Forttu están documentados en [docs/FORTTU_HANDOFF.md](./docs/FORTTU_HANDOFF.md). No son nombres confirmados de los campos externos de Forttu.
 
 Devuelve este contrato **interno**:
 

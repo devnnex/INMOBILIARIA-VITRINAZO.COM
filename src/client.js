@@ -1,4 +1,4 @@
-import { Backend, formatMoney, formatDate, escapeHtml, showToast, setBusy, setPageLoader } from './common.js';
+import { Backend, formatMoney, formatDate, formatRentalMonth, escapeHtml, showToast, setBusy, setPageLoader } from './common.js';
 import { openTransferPayment, updateTransferResume, getTransferToRestore } from './transfer.js';
 
   'use strict';
@@ -125,8 +125,8 @@ import { openTransferPayment, updateTransferResume, getTransferToRestore } from 
       if (Number(item.cargoExtra) > 0) adjustments.push('+' + formatMoney(item.cargoExtra) + ' cobro adicional');
       const original = Number(item.valorBase) + Number(item.cargoExtra || 0);
       return '<article class="ledger-item ' + (selected ? 'is-selected ' : '') + (paid ? 'is-paid' : '') + '" data-ledger-id="' + escapeHtml(item.id) + '">' +
-        '<label class="check-label" aria-label="Seleccionar ' + escapeHtml(formatSelectedMonth(item.periodo)) + '"><input type="checkbox" ' + (selected ? 'checked ' : '') + (paid ? 'disabled ' : '') + 'data-ledger-check="' + escapeHtml(item.id) + '"><span></span></label>' +
-        '<div class="ledger-item__period"><strong>' + escapeHtml(formatSelectedMonth(item.periodo)) + '</strong><span>Vence ' + formatDate(item.fechaVencimiento) + '</span></div>' +
+        '<label class="check-label" aria-label="Seleccionar ' + escapeHtml(formatRentalMonth(item.periodo)) + '"><input type="checkbox" ' + (selected ? 'checked ' : '') + (paid ? 'disabled ' : '') + 'data-ledger-check="' + escapeHtml(item.id) + '"><span></span></label>' +
+        '<div class="ledger-item__period"><strong>' + escapeHtml(formatRentalMonth(item.periodo)) + '</strong><span>Vence ' + formatDate(item.fechaVencimiento) + '</span></div>' +
         '<div class="ledger-item__note"><span>' + (adjustments.length ? escapeHtml(adjustments.join(' · ')) : 'Sin cambios en el valor') + '</span><p title="' + escapeHtml(item.observacion || '') + '">' + escapeHtml(item.observacion || 'Valor mensual del arriendo') + '</p></div>' +
         '<div class="ledger-item__amount">' + (Number(item.descuento) > 0 ? '<del>' + formatMoney(original) + '</del>' : '<span>Falta por pagar</span>') + '<strong>' + formatMoney(item.saldo) + '</strong></div>' +
         '<span class="badge ' + badgeClass(item.estadoCalculado) + '">' + escapeHtml(item.estadoCalculado) + '</span></article>';
@@ -179,19 +179,6 @@ import { openTransferPayment, updateTransferResume, getTransferToRestore } from 
     renderLedger(contract); updateSelection();
   });
   elements.newLookup.addEventListener('click', function () { state.selected.clear(); updateSelection(); document.getElementById('inicio').scrollIntoView({ behavior: 'smooth' }); setTimeout(function () { elements.input.focus(); elements.input.select(); }, 500); });
-
-  function formatSelectedMonth(value) {
-    const text = String(value || '').trim();
-    const names = { ENE: 'Enero', FEB: 'Febrero', MAR: 'Marzo', ABR: 'Abril', MAY: 'Mayo', JUN: 'Junio', JUL: 'Julio', AGO: 'Agosto', SEP: 'Septiembre', OCT: 'Octubre', NOV: 'Noviembre', DIC: 'Diciembre' };
-    const match = text.toUpperCase().match(/^(ENE|FEB|MAR|ABR|MAY|JUN|JUL|AGO|SEP|OCT|NOV|DIC)\s+(\d{4})$/);
-    if (match) return names[match[1]] + ' ' + match[2];
-    const date = new Date(text);
-    if (!Number.isNaN(date.getTime())) {
-      const label = new Intl.DateTimeFormat('es-CO', { month: 'long', year: 'numeric', timeZone: 'America/Bogota' }).format(date);
-      return label.charAt(0).toUpperCase() + label.slice(1).replace(' de ', ' ');
-    }
-    return text || 'Mes seleccionado';
-  }
 
   elements.openPayment.addEventListener('click', async function () {
     const contract = getActiveContract();

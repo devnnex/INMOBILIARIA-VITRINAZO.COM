@@ -1,4 +1,4 @@
-import { Backend, escapeHtml, formatMoney, setBusy, showToast } from './common.js';
+import { Backend, escapeHtml, formatMoney, formatRentalMonth, setBusy, showToast } from './common.js';
 
 const namespace = !Backend.isLive ? 'demo' : Backend.isTransferSimulation ? 'simulation' : 'live';
 const storageKey = 'vitrinazo-transfer-orders-v2-' + namespace;
@@ -105,7 +105,7 @@ export async function openTransferPayment(contractId, ledgerIds, onSuccess, resu
   }
   function renderSummary(months, amountInCents, reference) {
     summary.innerHTML = '<div class="payment-summary"><span>Total del pago</span><strong>' + escapeHtml(formatMoney(amountInCents / 100)) +
-      '</strong><div class="payment-summary__months">' + months.map(month => '<span class="payment-month-chip">' + escapeHtml(month.period) + '</span>').join('') + '</div>' +
+      '</strong><div class="payment-summary__months">' + months.map(month => '<span class="payment-month-chip">' + escapeHtml(formatRentalMonth(month.period)) + '</span>').join('') + '</div>' +
       (reference ? '<small title="' + escapeHtml(reference) + '">Referencia · ' + escapeHtml(reference) + '</small>' : '') + '</div>';
   }
   function render(result) {
@@ -153,7 +153,7 @@ export async function openTransferPayment(contractId, ledgerIds, onSuccess, resu
     dialog.querySelector('#transferTitle').textContent = waiting ? 'Transfiere y adjunta' : pending ? 'Ya casi está' : 'Revisemos tu pago';
     if (approved) {
       success.querySelector('[data-success-amount]').textContent = formatMoney(result.amountInCents / 100);
-      success.querySelector('.transfer-success__months').innerHTML = result.months.map(month => '<span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg>' + escapeHtml(month.period) + '</span>').join('');
+      success.querySelector('.transfer-success__months').innerHTML = result.months.map(month => '<span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg>' + escapeHtml(formatRentalMonth(month.period)) + '</span>').join('');
       success.querySelector('[data-success-contract]').textContent = result.contractId;
       const reference = success.querySelector('[data-success-reference]');
       reference.textContent = 'Ref. ' + result.reference.slice(-8).toUpperCase();

@@ -553,6 +553,9 @@ tr.is-saving td small { color: #2387ad; }
 .payment-test-mode button { padding: .25rem 0; border: 0; color: #647b8a; background: none; font-size: .72rem; cursor: pointer; }
 .payment-test-mode button:hover { color: var(--ink); }
 .transfer-resume { margin-bottom: 1rem; }
+.account-month.is-paid { border-color: #d5e9dd; background: #f8fcf9; }
+.account-month__amount .badge { display: inline-flex; margin-top: .35rem; font-size: .56rem; }
+.payment-month-labels { max-width: 300px; white-space: normal; overflow-wrap: anywhere; }
 .transfer-modal { width: min(540px, calc(100% - 28px)); border-radius: 28px; }
 .transfer-modal .modal__surface { padding: 2rem; border: 1px solid rgba(255,255,255,.7); border-radius: 28px; background: #fdfefe; }
 .transfer-modal .modal__close { top: 1.2rem; right: 1.2rem; width: 32px; height: 32px; font-size: 1.4rem; }

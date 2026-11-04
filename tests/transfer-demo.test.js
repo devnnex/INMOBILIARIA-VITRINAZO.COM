@@ -5,7 +5,7 @@ import test from 'node:test';
 import vm from 'node:vm';
 
 const source = readFileSync(new URL('../src/common.js', import.meta.url), 'utf8')
-  .replace(/export \{[^}]+\};/, 'globalThis.api = Backend;');
+  .replace(/export \{[^}]+\};/, 'globalThis.api = Backend; globalThis.formatRentalMonth = formatRentalMonth;');
 const receipt = { mimeType: 'application/pdf', base64: Buffer.from('%PDF-1.7\nDEMO ONLY').toString('base64') };
 
 function load(storage = new Map()) {
@@ -49,7 +49,21 @@ const liveFixture = {
   ]
 };
 
-function loadWithBackend(storage = new Map(), { enabled = true, contract = structuredClone(liveFixture), clock = { now: Date.now() } } = {}) {
+function adminFixture(contract) {
+  const ledger = contract.cartera.map(row => ({ ...row, contratoId: contract.id }));
+  const snapshot = {
+    version: 1, versions: { clients: 1, properties: 1, contracts: 1, ledger: 1, payments: 1 },
+    clients: [{ id: 'CLI-REAL-1', documento: '123456789', nombre: 'Cliente de prueba uno' }], properties: [],
+    contracts: [{ id: contract.id, clienteId: 'CLI-REAL-1', clienteNombre: 'Cliente de prueba uno', estado: 'ACTIVO', saldo: 4700000 }],
+    ledger,
+    payments: [{ id: 'REAL-1', referencia: 'MAN-REAL-1', contratoId: contract.id, clienteId: 'CLI-REAL-1', valor: 250000, estado: 'APROBADO', metodo: 'EFECTIVO' }],
+    stats: { clientes: 1, contratosActivos: 1, cartera: 4700000, recaudado: 250000 }, pageInfo: {}
+  };
+  for (const section of ['clients', 'properties', 'contracts', 'ledger', 'payments']) snapshot.pageInfo[section] = { total: snapshot[section].length, offset: 0, nextOffset: snapshot[section].length, limit: 1000, hasMore: false };
+  return snapshot;
+}
+
+function loadWithBackend(storage = new Map(), { enabled = true, contract = structuredClone(liveFixture), clock = { now: Date.now() }, admin = adminFixture(contract) } = {}) {
   const requests = [];
   const context = vm.createContext({
     Date: class extends Date { static now() { return clock.now; } },
@@ -60,14 +74,31 @@ function loadWithBackend(storage = new Map(), { enabled = true, contract = struc
     setTimeout: callback => callback(),
     fetch(url, options) {
       const payload = JSON.parse(options.body); requests.push(payload);
-      const result = payload.action === 'lookupAccount' || payload.action === 'syncAccount'
+      let result = payload.action === 'lookupAccount' || payload.action === 'syncAccount'
         ? { ok: true, data: { found: true, version: 1, changed: true, contracts: [structuredClone(contract)] } }
         : { ok: false, error: 'Acción no permitida.' };
+      if (payload.action === 'getAdminDashboard') result = { ok: true, data: structuredClone(admin) };
+      if (payload.action === 'getContractLedgerForAdmin') result = { ok: true, data: structuredClone(admin.ledger.filter(row => row.contratoId === payload.args[1])) };
+      if (payload.action === 'getClientAccountForAdmin') {
+        const client = admin.clients.find(row => row.id === payload.args[1]);
+        const contracts = admin.contracts.filter(row => row.clienteId === client.id);
+        const ids = new Set(contracts.map(row => row.id));
+        result = { ok: true, data: structuredClone({ client, contracts, ledger: admin.ledger.filter(row => ids.has(row.contratoId)), payments: admin.payments.filter(row => ids.has(row.contratoId)) }) };
+      }
+      if (payload.action === 'getAdminPage') {
+        const section = payload.args[1], offset = payload.args[2] || 0;
+        result = { ok: true, data: { version: 1, versions: admin.versions, section, page: { ...admin.pageInfo[section], items: structuredClone(admin[section].slice(offset)), offset } } };
+      }
+      if (payload.action === 'getAdminSync') {
+        const sections = {};
+        if (admin.changed) for (const section of ['contracts', 'ledger', 'payments']) sections[section] = { ...admin.pageInfo[section], items: structuredClone(admin[section]) };
+        result = { ok: true, data: { version: 1, versions: admin.versions, changed: Boolean(admin.changed), stats: structuredClone(admin.stats), sections } };
+      }
       return Promise.resolve({ ok: true, json: () => Promise.resolve(result) });
     }
   });
   vm.runInContext(enabled ? source : source.replace('const TRANSFER_SIMULATION_ENABLED = true;', 'const TRANSFER_SIMULATION_ENABLED = false;'), context);
-  return { call: (method, ...args) => context.api.call(method, ...args), api: context.api, storage, requests, contract, clock };
+  return { call: (method, ...args) => context.api.call(method, ...args), api: context.api, storage, requests, contract, clock, admin, formatMonth: context.formatRentalMonth };
 }
 
 async function createLiveOrder(h, ids = ['MES-CUALQUIERA-1']) {
@@ -200,4 +231,85 @@ test('demo requires a receipt, a valid access token and valid file signatures', 
   await assert.rejects(h.call('submitTransferReceipt', order.reference, 'bad-token', receipt), /acceder/);
   await assert.rejects(h.call('submitTransferReceipt', order.reference, order.accessToken, { mimeType: 'image/png', base64: Buffer.from('fake image').toString('base64') }), /válido/);
   assert.equal((await h.call('getTransferOrder', order.reference, order.accessToken)).status, 'ESPERANDO_COMPROBANTE');
+});
+
+async function approveAutomatically(h) {
+  const order = await createLiveOrder(h);
+  await h.call('submitTransferReceipt', order.reference, order.accessToken, receipt);
+  h.clock.now += 2500;
+  await h.call('refreshTransferOrder', order.reference, order.accessToken);
+  return order;
+}
+
+test('admin shows the simulated credit, paid months, customer and history from the same browser without writing real records', async () => {
+  const portal = loadWithBackend(); await approveAutomatically(portal);
+  const admin = loadWithBackend(portal.storage);
+  const dashboard = await admin.call('getAdminDashboard', 'admin-token', 1000);
+  assert.equal(dashboard.stats.cartera, 3000000);
+  assert.equal(dashboard.stats.recaudado, 1950000);
+  assert.equal(dashboard.contracts[0].saldo, 3000000);
+  assert.equal(dashboard.ledger[0].estadoCalculado, 'PAGADO');
+  assert.equal(dashboard.ledger[1].saldo, 3000000);
+  assert.equal(dashboard.payments.length, 2);
+  assert.equal(dashboard.payments[0].clienteId, 'CLI-REAL-1');
+  assert.equal(dashboard.payments[0].clienteNombre, 'Cliente de prueba uno');
+  assert.equal(dashboard.payments[0].metodo, 'TRANSFERENCIA_SIMULADA');
+  const account = await admin.call('getClientAccountForAdmin', 'admin-token', 'CLI-REAL-1');
+  assert.equal(account.ledger[0].saldo, 0);
+  assert.equal(account.payments.length, 2);
+  assert.equal((await admin.call('getContractLedgerForAdmin', 'admin-token', liveFixture.id))[0].saldo, 0);
+  assert.equal(admin.admin.ledger[0].valorPagado, 250000);
+  assert.ok(admin.requests.every(request => request.action.startsWith('get')));
+});
+
+test('an already open admin tab refreshes from shared storage idempotently and reset restores its original totals', async () => {
+  const portal = loadWithBackend(); const admin = loadWithBackend(portal.storage);
+  let dashboard = await admin.call('getAdminDashboard', 'admin-token', 1000);
+  await approveAutomatically(portal);
+  for (let attempt = 0; attempt < 3; attempt++) {
+    dashboard = admin.api.projectAdminSimulation(dashboard);
+    assert.equal(dashboard.stats.cartera, 3000000);
+    assert.equal(dashboard.stats.recaudado, 1950000);
+    assert.equal(dashboard.contracts[0].saldo, 3000000);
+    assert.equal(dashboard.payments.length, 2);
+    assert.equal(dashboard.pageInfo.payments.total, 2);
+  }
+  portal.api.resetTransferSimulation();
+  dashboard = admin.api.projectAdminSimulation(dashboard);
+  assert.equal(dashboard.stats.cartera, 4700000);
+  assert.equal(dashboard.stats.recaudado, 250000);
+  assert.equal(dashboard.ledger[0].saldo, 1700000);
+  assert.equal(dashboard.contracts[0].saldo, 4700000);
+  assert.equal(dashboard.payments.length, 1);
+  assert.equal(dashboard.pageInfo.payments.total, 1);
+});
+
+test('admin pagination, sync and client scopes preserve the same simulation without crediting a different contract', async () => {
+  const h = loadWithBackend(); await approveAutomatically(h);
+  h.admin.clients.push({ id: 'CLI-REAL-2', nombre: 'Otro cliente' });
+  h.admin.contracts.push({ id: 'OTRO-CONTRATO', clienteId: 'CLI-REAL-2', saldo: 9000000 });
+  h.admin.ledger.push({ ...liveFixture.cartera[0], contratoId: 'OTRO-CONTRATO' });
+  const account = await h.call('getClientAccountForAdmin', 'admin-token', 'CLI-REAL-2');
+  assert.equal(account.ledger[0].saldo, 1700000);
+  assert.equal(account.contracts[0].saldo, 9000000);
+  assert.equal(account.payments.length, 0);
+  const page = await h.call('getAdminPage', 'admin-token', 'payments', 0, 1000);
+  assert.equal(page.page.items.length, 2);
+  assert.equal(page.page.total, 2);
+  h.admin.changed = true;
+  const sync = await h.call('getAdminSync', 'admin-token', {});
+  assert.equal(sync.stats.cartera, 3000000);
+  assert.equal(sync.sections.ledger.items[0].saldo, 0);
+  assert.equal(sync.sections.payments.items.length, 2);
+  const real = loadWithBackend(h.storage, { enabled: false });
+  assert.equal((await real.call('getAdminDashboard', 'admin-token')).stats.cartera, 4700000);
+});
+
+test('all rental periods use readable Spanish month names without changing their stored identifiers', () => {
+  const h = loadWithBackend();
+  for (const value of ['2026-11', '2026-11-01T00:00:00.000Z', 'NOV 2026', 'Noviembre 2026', 'nov. de 2026']) {
+    assert.equal(h.formatMonth(value), 'Noviembre de 2026');
+  }
+  assert.equal(h.formatMonth('', '2027-01-10'), 'Enero de 2027');
+  assert.equal(h.formatMonth('DIC 2026', '2027-01-02'), 'Diciembre de 2026');
 });
