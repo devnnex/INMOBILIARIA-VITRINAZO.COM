@@ -48,6 +48,17 @@ async function screenshot(name) {
   const shot = await cdp('Page.captureScreenshot', { format: 'png' });
   await writeFile(join(tmpdir(), name + '.png'), Buffer.from(shot.data, 'base64'));
 }
+function waitForLoad() {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => { socket.removeEventListener('message', listener); reject(new Error('Navigation timed out')); }, 12000);
+    function listener(event) {
+      if (JSON.parse(event.data).method !== 'Page.loadEventFired') return;
+      clearTimeout(timer); socket.removeEventListener('message', listener); resolve();
+    }
+    socket.addEventListener('message', listener);
+  });
+}
+async function reload() { const loaded = waitForLoad(); await cdp('Page.reload'); await loaded; }
 async function upload() {
   const { root } = await cdp('DOM.getDocument');
   const { nodeId } = await cdp('DOM.querySelector', { nodeId: root.nodeId, selector: 'input[name=receipt]' });
@@ -58,11 +69,41 @@ async function upload() {
 try {
   await cdp('Runtime.enable'); await cdp('Page.enable'); await cdp('Network.enable');
   await cdp('Emulation.setDeviceMetricsOverride', { width: 1280, height: 1000, deviceScaleFactor: 1, mobile: false });
-  await cdp('Page.navigate', { url: 'http://127.0.0.1:5178/?demo=1' });
-  await wait(`document.getElementById('demoHint')?.hidden === false`);
-  await click('#resetDemo');
-  await wait(`document.getElementById('demoHint')?.hidden === false`);
-  await click('[data-demo-query="CV-2026-0042"]');
+  // The normal URL uses the existing lookup API while all transfer actions are
+  // simulated locally, including when that backend predates Forttu support.
+  await cdp('Page.addScriptToEvaluateOnNewDocument', { source: `(() => {
+    const contract = {
+      id:'CONTRATO-CUALQUIERA', estado:'ACTIVO', fechaInicio:'2026-01-01', canonMensual:2450000,
+      cliente:{nombre:'Persona de prueba', documento:'DOCUMENTO-PRUEBA'},
+      vivienda:{codigo:'PRUEBA-001', tipo:'Apartamento', barrio:'Prueba', direccion:'Dirección de prueba', ciudad:'Bogotá'},
+      resumen:{saldo:7315000},
+      cartera:[
+        {id:'CAR-DEMO-003',periodo:'MAR 2026',valorBase:2450000,descuento:120000,cargoExtra:0,valorPagado:0,saldo:2330000,estado:'PENDIENTE',fechaVencimiento:'2026-03-10'},
+        {id:'CAR-DEMO-004',periodo:'ABR 2026',valorBase:2450000,descuento:0,cargoExtra:85000,valorPagado:0,saldo:2535000,estado:'PENDIENTE',fechaVencimiento:'2026-04-10'},
+        {id:'CAR-DEMO-005',periodo:'MAY 2026',valorBase:2450000,descuento:0,cargoExtra:0,valorPagado:0,saldo:2450000,estado:'PENDIENTE',fechaVencimiento:'2026-05-10'}
+      ]
+    };
+    window.__backendActions=[];
+    const originalFetch=window.fetch;
+    window.fetch=function(input, options) {
+      if (!String(input).startsWith('https://script.google.com/')) return originalFetch(input,options);
+      const {action}=JSON.parse(options.body); window.__backendActions.push(action);
+      const result=action==='lookupAccount'
+        ? {ok:true,data:{found:true,version:1,contracts:[contract]}}
+        : action==='syncAccount' ? {ok:true,data:{changed:false,version:1}}
+        : {ok:false,error:'Acción no permitida.'};
+      return Promise.resolve(new Response(JSON.stringify(result),{headers:{'Content-Type':'application/json'}}));
+    };
+  })()` });
+  const initialLoad = waitForLoad();
+  await cdp('Page.navigate', { url: 'http://127.0.0.1:5178/' });
+  await initialLoad;
+  await wait(`document.getElementById('paymentSimulationHint')?.hidden === false`);
+  const resetLoad = waitForLoad();
+  await click('#resetPaymentSimulation');
+  await resetLoad;
+  await wait(`document.getElementById('paymentSimulationHint')?.hidden === false`);
+  await evaluate(`document.getElementById('lookupInput').value='CONTRATO-CUALQUIERA';document.getElementById('lookupForm').requestSubmit()`);
   await wait(`document.querySelector('[data-ledger-check="CAR-DEMO-003"]')`);
   await click('[data-ledger-check="CAR-DEMO-003"]'); await click('[data-ledger-check="CAR-DEMO-004"]');
   assert.match(await evaluate(`document.getElementById('selectedTotal').textContent`), /4.865.000/);
@@ -76,11 +117,11 @@ try {
   const reference = await evaluate(`document.querySelector('.transfer-selection small').textContent`);
   await evaluate(`window.dispatchEvent(new Event('blur')); document.dispatchEvent(new Event('visibilitychange')); window.dispatchEvent(new Event('focus'));`);
   assert.equal(await evaluate(`document.querySelector('.transfer-selection small').textContent`), reference);
-  await cdp('Page.reload');
+  await reload();
   await wait(`document.querySelector('.transfer-receipt-form')?.hidden === false`);
   assert.equal(await evaluate(`document.querySelector('.transfer-selection small').textContent`), reference);
   await upload();
-  await cdp('Page.reload');
+  await reload();
   await wait(`document.querySelector('.transfer-progress')?.hidden === false`);
   assert.equal(await evaluate(`document.querySelector('.transfer-selection small').textContent`), reference);
   await wait(`document.querySelector('[data-ledger-id="CAR-DEMO-003"]')`);
@@ -93,6 +134,11 @@ try {
   await screenshot('vitrinazo-transfer-success');
   await click('[data-transfer-finish]');
   await wait(`!document.querySelector('.transfer-modal')`);
+  assert.equal(await evaluate(`document.querySelector('[data-ledger-id="CAR-DEMO-003"] .badge').textContent`), 'PAGADO');
+  assert.equal(await evaluate(`document.querySelector('[data-ledger-id="CAR-DEMO-004"] .badge').textContent`), 'PAGADO');
+  // A fresh lookup after closing must retain the two simulated paid badges.
+  await evaluate(`document.getElementById('lookupForm').requestSubmit()`);
+  await wait(`document.querySelector('[data-ledger-id="CAR-DEMO-003"] .badge')?.textContent === 'PAGADO'`);
   await click('[data-ledger-check="CAR-DEMO-005"]'); await click('#openPayment');
   await wait(`document.querySelector('.transfer-account-form')?.hidden === false`);
   await click('.transfer-account-form button');
@@ -105,6 +151,8 @@ try {
   assert.ok(layout.width <= 390); assert.equal(layout.overflow, false);
   await screenshot('vitrinazo-transfer-mobile');
   assert.equal(requests.filter(url => url.includes('script.google.com') || url.includes('script.googleusercontent.com')).length, 0);
+  assert.equal(await evaluate(`location.search`), '');
+  assert.equal(await evaluate(`window.__backendActions.some(action=> !['lookupAccount','syncAccount'].includes(action))`), false);
   assert.deepEqual(errors, []);
   console.log('PASS: bank choice, total, app return, reload before/after receipt, pending without credit, exact approval, second order, amount mismatch, mobile width, zero production API requests.');
 } finally { socket.close(); }

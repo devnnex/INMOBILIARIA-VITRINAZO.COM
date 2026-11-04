@@ -77,21 +77,24 @@ Para restaurar el PIN de pruebas a `1234`, ejecuta `resetAdminPin`. Esto invalid
 
 ## Simular el flujo completo de transferencia
 
-1. Ejecuta `npm run dev` y abre la URL que muestre Vite con `/?demo=1` (por ejemplo, `http://127.0.0.1:5173/?demo=1`). En el servidor local de esta sesión: `http://127.0.0.1:5178/?demo=1`.
-2. Pulsa el contrato de demostración `CV-2026-0042`, selecciona los meses y pulsa **Continuar al pago**.
-3. Elige una cuenta ficticia y confírmala. Aparecerán el total, los meses, los datos bancarios con botones **Copiar** y las instrucciones para regresar y adjuntar el comprobante.
+La simulación de pagos está activada por defecto en la dirección normal del sitio, para cualquier contrato consultado. No necesita parámetros en la URL ni un contrato de demostración. Las consultas de clientes, contratos y cartera siguen usando el backend configurado; las solicitudes, comprobantes recibidos y abonos de prueba se gestionan en el navegador.
+
+1. Abre [el portal](https://devnnex.github.io/INMOBILIARIA-VITRINAZO.COM/) o ejecuta `npm run dev` y abre la URL que indique Vite. En el servidor local de esta sesión: `http://127.0.0.1:5178/`.
+2. Consulta cualquier cédula o contrato registrado, selecciona meses pendientes y pulsa **Continuar al pago**.
+3. Elige una cuenta ficticia y confírmala. Aparecerán el total de esos meses, la referencia, los datos para copiar y las instrucciones para regresar y adjuntar el comprobante.
 4. Cambia de aplicación o recarga la página: se recupera la solicitud y el paso donde estabas. Si cierras el modal, usa **Revisar mi transferencia** para retomarlo.
-5. Sube cualquier PNG/JPG o PDF de prueba válido, de máximo 4 MB. Puedes usar `assets/logo-vitrinazo.png`. Aparecerá la espera de verificación en el mismo modal; todavía no se pagan los meses.
-6. Usa los botones **Aprobar monto exacto**, **Monto incorrecto** o **Rechazar comprobante** para simular la respuesta de Forttu. Solo la aprobación exacta muestra **Pago realizado exitosamente** y paga los meses seleccionados.
-7. Pulsa **Reiniciar simulación** en el recuadro de demo para probar otro escenario. El panel de prueba está en `/admin.html?demo=1`, con PIN `1234`, y muestra los pagos simulados.
+5. Sube un PNG/JPG o PDF de prueba válido, de máximo 4 MB. Puedes usar `assets/logo-vitrinazo.png`. Aparecerá la espera de verificación en el mismo modal; todavía no se pagan los meses.
+6. Usa **Aprobar monto exacto**, **Monto incorrecto** o **Rechazar comprobante**. Solo la aprobación exacta muestra **Pago realizado exitosamente** y actualiza los meses seleccionados de ese contrato con badge **PAGADO** y saldo cero en la vista local.
+7. Cierra el modal: los otros meses y contratos mantienen sus saldos. Recargar o volver a consultar conserva los abonos simulados en ese navegador. **Reiniciar pagos simulados** descarta las pruebas y recupera los saldos del servidor.
 
-`?demo=1` utiliza exclusivamente datos locales ficticios, sin llamadas al Apps Script configurado y sin movimientos de dinero. Las solicitudes y la caché del modo real están separadas de la simulación. El archivo del comprobante no se conserva en el navegador; la demo solo persiste que se recibió. No hay aprobación automática por subir un archivo o esperar unos segundos.
+El aviso **Simulación de pagos activa** identifica este comportamiento. Las acciones de transferencia no llaman a las funciones todavía inexistentes del backend publicado. Los abonos simulados no escriben en Google Sheets ni en el historial administrativo real, y no se cobran fondos. El comprobante no se almacena en el navegador: solo se conserva que fue recibido. Las solicitudes y la caché de simulación están separadas de los pagos reales.
 
+Para conectar Forttu, implementar y probar el adaptador del backend según la guía de integración y después cambiar `TRANSFER_SIMULATION_ENABLED` a `false` en `src/common.js`. Al desactivar esa constante, las transferencias usan la API real y no se proyectan los abonos de prueba sobre la cartera.
 PSE y Wompi ya no aparecen en el portal y no se permite iniciar nuevos checkouts por la API pública. Se conserva el código de eventos históricos para las transacciones que pudieran estar en curso en un despliegue anterior.
 
 ## Preparación de integración con Forttu
 
-El flujo de transferencia con comprobante está listo para simular: el cliente selecciona meses, elige cuenta, copia los datos, transfiere desde su banco y vuelve a subir el archivo. La pantalla mantiene la espera, consulta automáticamente la verificación y actualiza la cartera solo después de la confirmación del servidor. La consulta autenticada impulsa la conciliación de esa solicitud; una tarea cada minuto sirve de respaldo si el cliente cierra el navegador. La conexión real permanece desactivada hasta que el ingeniero implemente el adaptador oficial y pruebe la API de Forttu. En modo real, el botón explica la indisponibilidad sin ofrecer otros proveedores ni mostrar cuentas ficticias.
+El flujo completo funciona actualmente con simulación de pagos por defecto para cualquier contrato. La conexión real permanece desactivada hasta que el ingeniero implemente el adaptador oficial y pruebe la API de Forttu. Una vez integrado y desactivada la simulación del frontend, la consulta autenticada impulsará la conciliación de la solicitud y una tarea cada minuto servirá de respaldo si el cliente cierra el navegador.
 
 La guía principal para el ingeniero es [FLUJO_TRANSFERENCIAS_FORTTU.md](./FLUJO_TRANSFERENCIAS_FORTTU.md). Describe estados, solicitudes persistidas, comprobantes privados, recuperación, pruebas y los dos métodos que conectarán con el proveedor. Es necesario actualizar Apps Script y el frontend para publicar estos cambios; no se ha modificado el despliegue remoto.
 

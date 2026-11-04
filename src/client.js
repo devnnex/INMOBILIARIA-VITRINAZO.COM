@@ -11,7 +11,7 @@ import { openTransferPayment, updateTransferResume, getTransferToRestore } from 
     newLookup: document.getElementById('newLookup'), demoHint: document.getElementById('demoHint')
   };
   const state = { query: '', contracts: [], activeId: '', selected: new Set(), filter: 'all', version: 0, poller: null };
-  const ACCOUNT_CACHE_KEY = 'vitrinazo-last-account-v2-' + (Backend.isLive ? 'live' : 'demo');
+  const ACCOUNT_CACHE_KEY = 'vitrinazo-last-account-v2-' + (!Backend.isLive ? 'demo' : Backend.isTransferSimulation ? 'simulation' : 'live');
 
   function normalizeAccountQuery(value) { return String(value || '').trim().toUpperCase().replace(/[\s.]/g, ''); }
   function getCachedAccount(query) {
@@ -37,7 +37,10 @@ import { openTransferPayment, updateTransferResume, getTransferToRestore } from 
     startVersionPolling();
   }
 
-  if (!Backend.isLive) elements.demoHint.hidden = false;
+  if (!Backend.isLive) {
+    elements.demoHint.hidden = false;
+  }
+  if (Backend.isLive && Backend.isTransferSimulation) document.getElementById('paymentSimulationHint').hidden = false;
 
   elements.input.addEventListener('input', function () { elements.clear.hidden = !elements.input.value; });
   elements.clear.addEventListener('click', function () { elements.input.value = ''; elements.clear.hidden = true; elements.input.focus(); });
@@ -193,6 +196,7 @@ import { openTransferPayment, updateTransferResume, getTransferToRestore } from 
   elements.openPayment.addEventListener('click', async function () {
     const contract = getActiveContract();
     if (!contract || !state.selected.size) return;
+    Backend.prepareTransferSimulation(contract);
     const months = contract.cartera.filter(item => state.selected.has(item.id)).map(item => ({
       id: item.id, period: item.periodo, amountInCents: Math.round(item.saldo * 100)
     }));
@@ -203,6 +207,14 @@ import { openTransferPayment, updateTransferResume, getTransferToRestore } from 
   async function refreshAfterTransfer() {
     state.selected.clear();
     if (!state.query) return;
+    if (Backend.isLive && Backend.isTransferSimulation) {
+      // Mostrar los badges antes de cerrar el éxito, sin esperar a la red.
+      showAccountResult(state.query, {
+        found: true, version: state.version,
+        contracts: state.contracts.map(contract => Backend.prepareTransferSimulation(contract))
+      }, false);
+      return;
+    }
     // La confirmación requiere una consulta fresca, sin reutilizar la caché previa al pago.
     const result = await Backend.call('lookupAccount', state.query);
     if (result.found) showAccountResult(state.query, result, false);
@@ -263,6 +275,14 @@ import { openTransferPayment, updateTransferResume, getTransferToRestore } from 
     await account;
   }
   restoreTransferSession().catch(error => showToast(error.message, 'error'));
+
+  document.getElementById('resetPaymentSimulation').addEventListener('click', function () {
+    Backend.resetTransferSimulation();
+    localStorage.removeItem('vitrinazo-transfer-orders-v2-simulation');
+    sessionStorage.removeItem('vitrinazo-active-transfer-simulation');
+    sessionStorage.removeItem(ACCOUNT_CACHE_KEY);
+    window.location.reload();
+  });
 
   if (!Backend.isLive) {
     document.getElementById('resetDemo').addEventListener('click', function () {

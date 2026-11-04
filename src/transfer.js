@@ -1,6 +1,6 @@
 import { Backend, escapeHtml, formatMoney, setBusy, showToast } from './common.js';
 
-const namespace = Backend.isLive ? 'live' : 'demo';
+const namespace = !Backend.isLive ? 'demo' : Backend.isTransferSimulation ? 'simulation' : 'live';
 const storageKey = 'vitrinazo-transfer-orders-v2-' + namespace;
 const activeKey = 'vitrinazo-active-transfer-' + namespace;
 const terminalStates = ['APROBADO', 'RECHAZADO', 'EN_REVISION'];
@@ -8,7 +8,7 @@ let activeDialog = null;
 
 function savedTransfers() {
   try {
-    const value = JSON.parse(localStorage.getItem(storageKey) || (Backend.isLive && localStorage.getItem('vitrinazo-transfer-orders-v1')) || '{}');
+    const value = JSON.parse(localStorage.getItem(storageKey) || (namespace === 'live' && localStorage.getItem('vitrinazo-transfer-orders-v1')) || '{}');
     return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
   } catch (error) { return {}; }
 }
@@ -51,7 +51,7 @@ export async function openTransferPayment(contractId, ledgerIds, onSuccess, resu
     '<button class="modal__close" type="button" data-transfer-close aria-label="Cerrar">×</button>' +
     '<p class="kicker">Transferencia bancaria</p><h2 id="transferTitle">Elige la cuenta de destino</h2>' +
     '<ol class="transfer-steps" aria-label="Pasos del pago"><li>1. Transfiere</li><li>2. Sube el comprobante</li><li>3. Confirmación</li></ol>' +
-    (!Backend.isLive ? '<p class="transfer-demo-notice">SIMULACIÓN · Datos ficticios. No realices transferencias reales.</p>' : '') +
+    (Backend.isTransferSimulation ? '<p class="transfer-demo-notice">SIMULACIÓN DE PAGO · Cuentas ficticias. No realices transferencias reales. Los resultados de prueba se guardan solo en este navegador.</p>' : '') +
     '<div class="transfer-feedback" role="status" aria-live="polite">Consultando la información…</div>' +
     '<div class="transfer-progress" role="status" hidden><span class="button-spinner" aria-hidden="true">◌</span> Esperando la confirmación de Forttu…</div>' +
     '<div class="transfer-selection"></div>' +
@@ -62,7 +62,7 @@ export async function openTransferPayment(contractId, ledgerIds, onSuccess, resu
     '<input type="file" name="receipt" accept="application/pdf,image/jpeg,image/png" required></label>' +
     '<p class="field-hint">PDF, JPG o PNG. Máximo 4 MB. Selecciona el archivo y pulsa Enviar comprobante.</p>' +
     '<button class="button button--primary button--full" type="submit">Enviar comprobante</button></form>' +
-    (!Backend.isLive ? '<div class="transfer-simulation" hidden><strong>Simular respuesta de Forttu</strong><p>Elige el resultado después de subir un archivo de prueba.</p>' +
+    (Backend.isTransferSimulation ? '<div class="transfer-simulation" hidden><strong>Simular respuesta de Forttu</strong><p>Elige el resultado después de subir un archivo de prueba.</p>' +
       '<div><button class="button button--soft" type="button" data-simulate="APPROVED">Aprobar monto exacto</button>' +
       '<button class="button button--soft" type="button" data-simulate="WRONG_AMOUNT">Monto incorrecto</button>' +
       '<button class="button button--soft" type="button" data-simulate="REJECTED">Rechazar comprobante</button></div></div>' : '') +
@@ -89,7 +89,9 @@ export async function openTransferPayment(contractId, ledgerIds, onSuccess, resu
 
   function fail(error) {
     if (dialog.open) {
-      feedback.textContent = error.message || 'No fue posible consultar tu transferencia. Reintentaremos automáticamente.';
+      feedback.textContent = error.message === 'Acción no permitida.'
+        ? 'El pago por transferencia todavía no está disponible en este sitio.'
+        : error.message || 'No fue posible consultar tu transferencia. Reintentaremos automáticamente.';
       feedback.classList.add('is-error');
     }
   }
