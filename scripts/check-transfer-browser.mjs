@@ -63,7 +63,6 @@ async function upload() {
   const { root } = await cdp('DOM.getDocument');
   const { nodeId } = await cdp('DOM.querySelector', { nodeId: root.nodeId, selector: 'input[name=receipt]' });
   await cdp('DOM.setFileInputFiles', { nodeId, files: [fileURLToPath(new URL('../assets/logo-vitrinazo.png', import.meta.url))] });
-  await click('.transfer-receipt-form button');
   await wait(`document.querySelector('.transfer-progress')?.hidden === false`);
 }
 try {
@@ -127,12 +126,17 @@ try {
   await wait(`document.querySelector('[data-ledger-id="CAR-DEMO-003"]')`);
   assert.equal(await evaluate(`document.querySelector('[data-ledger-id="CAR-DEMO-003"]').classList.contains('is-paid')`), false);
   await screenshot('vitrinazo-transfer-waiting');
-  await click('[data-simulate=APPROVED]');
-  await wait(`document.querySelector('#transferTitle')?.textContent === 'Pago realizado exitosamente'`);
+  await wait(`document.querySelector('.transfer-success')?.hidden === false`);
+  assert.equal(await evaluate(`document.querySelector('#transferSuccessTitle').textContent`), '¡Pago exitoso!');
+  assert.ok(await evaluate(`document.querySelectorAll('.transfer-confetti > i').length > 0`));
+  assert.equal(await evaluate(`document.querySelector('[data-simulate]')`), null);
   await wait(`document.querySelector('[data-ledger-id="CAR-DEMO-003"]')?.classList.contains('is-paid')`);
   assert.equal(await evaluate(`document.querySelector('[data-ledger-id="CAR-DEMO-005"]').classList.contains('is-paid')`), false);
+  await new Promise(resolve => setTimeout(resolve, 500));
   await screenshot('vitrinazo-transfer-success');
-  await click('[data-transfer-finish]');
+  await cdp('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+  await screenshot('vitrinazo-transfer-success-mobile');
+  await click('.transfer-success [data-transfer-finish]');
   await wait(`!document.querySelector('.transfer-modal')`);
   assert.equal(await evaluate(`document.querySelector('[data-ledger-id="CAR-DEMO-003"] .badge').textContent`), 'PAGADO');
   assert.equal(await evaluate(`document.querySelector('[data-ledger-id="CAR-DEMO-004"] .badge').textContent`), 'PAGADO');
@@ -143,9 +147,16 @@ try {
   await wait(`document.querySelector('.transfer-account-form')?.hidden === false`);
   await click('.transfer-account-form button');
   await wait(`document.querySelector('.transfer-receipt-form')?.hidden === false`);
-  await upload(); await click('[data-simulate=WRONG_AMOUNT]');
-  await wait(`document.querySelector('.transfer-feedback')?.textContent.includes('no coinciden')`);
+  await screenshot('vitrinazo-transfer-upload-mobile');
+  const invalidDocument = await cdp('DOM.getDocument');
+  const invalidInput = await cdp('DOM.querySelector', { nodeId: invalidDocument.root.nodeId, selector: 'input[name=receipt]' });
+  await cdp('DOM.setFileInputFiles', { nodeId: invalidInput.nodeId, files: [fileURLToPath(new URL('../package.json', import.meta.url))] });
+  await wait(`document.querySelector('.transfer-feedback')?.classList.contains('is-error')`);
+  assert.equal(await evaluate(`document.querySelector('.transfer-success').hidden`), true);
   assert.equal(await evaluate(`document.querySelector('[data-ledger-id="CAR-DEMO-005"]').classList.contains('is-paid')`), false);
+  await upload();
+  await wait(`document.querySelector('.transfer-success')?.hidden === false`);
+  await wait(`document.querySelector('[data-ledger-id="CAR-DEMO-005"]')?.classList.contains('is-paid')`);
   await cdp('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
   const layout = await evaluate(`(()=>{const dialog=document.querySelector('.transfer-modal');const surface=dialog.querySelector('.modal__surface');return {width:dialog.getBoundingClientRect().width,overflow:surface.scrollWidth>surface.clientWidth};})()`);
   assert.ok(layout.width <= 390); assert.equal(layout.overflow, false);
@@ -154,5 +165,5 @@ try {
   assert.equal(await evaluate(`location.search`), '');
   assert.equal(await evaluate(`window.__backendActions.some(action=> !['lookupAccount','syncAccount'].includes(action))`), false);
   assert.deepEqual(errors, []);
-  console.log('PASS: bank choice, total, app return, reload before/after receipt, pending without credit, exact approval, second order, amount mismatch, mobile width, zero production API requests.');
+  console.log('PASS: Spanish upload, invalid-file rejection, automatic submission and approval, confetti, paid badges, reload recovery, second payment, mobile width, zero production payment API requests.');
 } finally { socket.close(); }

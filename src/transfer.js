@@ -49,26 +49,31 @@ export async function openTransferPayment(contractId, ledgerIds, onSuccess, resu
   dialog.setAttribute('aria-labelledby', 'transferTitle');
   dialog.innerHTML = '<div class="modal__surface">' +
     '<button class="modal__close" type="button" data-transfer-close aria-label="Cerrar">×</button>' +
-    '<p class="kicker">Transferencia bancaria</p><h2 id="transferTitle">Elige la cuenta de destino</h2>' +
-    '<ol class="transfer-steps" aria-label="Pasos del pago"><li>1. Transfiere</li><li>2. Sube el comprobante</li><li>3. Confirmación</li></ol>' +
-    (Backend.isTransferSimulation ? '<p class="transfer-demo-notice">SIMULACIÓN DE PAGO · Cuentas ficticias. No realices transferencias reales. Los resultados de prueba se guardan solo en este navegador.</p>' : '') +
-    '<div class="transfer-feedback" role="status" aria-live="polite">Consultando la información…</div>' +
-    '<div class="transfer-progress" role="status" hidden><span class="button-spinner" aria-hidden="true">◌</span> Esperando la confirmación de Forttu…</div>' +
+    '<div class="transfer-confetti" aria-hidden="true"></div><div class="transfer-main">' +
+    '<div class="transfer-heading"><span class="transfer-brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m3 10 9-6 9 6M4 10h16M6 10v8m6-8v8m6-8v8M3 21h18"/></svg></span>' +
+    '<p class="kicker">Tu próximo paso</p>' + (Backend.isTransferSimulation ? '<span class="transfer-test-tag">Modo prueba</span>' : '') + '</div>' +
+    '<h2 id="transferTitle">Elige tu cuenta</h2>' +
+    '<ol class="transfer-steps" aria-label="Pasos del pago"><li data-step="1" class="is-current"><span>01</span> Cuenta</li><li data-step="2"><span>02</span> Comprobante</li><li data-step="3"><span>03</span> Confirmación</li></ol>' +
     '<div class="transfer-selection"></div>' +
-    '<form class="transfer-account-form" hidden><label>¿A qué cuenta deseas transferir?<select name="accountId" required></select></label>' +
-    '<button class="button button--primary button--full" type="submit">Confirmar cuenta y ver datos para pagar</button></form>' +
+    '<div class="transfer-feedback" role="status" aria-live="polite">Preparando tu pago…</div>' +
+    '<div class="transfer-progress" role="status" hidden><span class="transfer-loader" aria-hidden="true"></span><strong>Verificando tu pago<span>La confirmación aparecerá aquí.</span></strong></div>' +
+    '<form class="transfer-account-form" hidden><label>Cuenta de destino<select name="accountId" required></select></label>' +
+    '<button class="button button--primary button--full" type="submit">Continuar <span aria-hidden="true">→</span></button></form>' +
     '<div class="transfer-details"></div>' +
-    '<form class="transfer-receipt-form" hidden><label>Adjunta el pantallazo o comprobante de tu pago' +
-    '<input type="file" name="receipt" accept="application/pdf,image/jpeg,image/png" required></label>' +
-    '<p class="field-hint">PDF, JPG o PNG. Máximo 4 MB. Selecciona el archivo y pulsa Enviar comprobante.</p>' +
-    '<button class="button button--primary button--full" type="submit">Enviar comprobante</button></form>' +
-    (Backend.isTransferSimulation ? '<div class="transfer-simulation" hidden><strong>Simular respuesta de Forttu</strong><p>Elige el resultado después de subir un archivo de prueba.</p>' +
-      '<div><button class="button button--soft" type="button" data-simulate="APPROVED">Aprobar monto exacto</button>' +
-      '<button class="button button--soft" type="button" data-simulate="WRONG_AMOUNT">Monto incorrecto</button>' +
-      '<button class="button button--soft" type="button" data-simulate="REJECTED">Rechazar comprobante</button></div></div>' : '') +
-    '<div class="payment-modal__actions"><button class="button button--ghost" type="button" data-transfer-close>Cerrar</button>' +
-    '<button class="button button--soft" type="button" data-transfer-check hidden>Consultar verificación</button>' +
-    '<button class="button button--primary" type="button" data-transfer-finish hidden>Volver a mi estado de cuenta</button></div></div>';
+    '<form class="transfer-receipt-form" hidden><label class="transfer-dropzone"><input type="file" name="receipt" accept="application/pdf,image/jpeg,image/png" aria-label="Seleccionar comprobante" required>' +
+    '<span class="transfer-upload-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 16V4m-4 4 4-4 4 4M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/></svg></span>' +
+    '<strong data-receipt-label>Arrastra tu comprobante aquí</strong><span>o <b>selecciona un archivo</b></span><small>JPG, PNG o PDF · Hasta 4 MB</small></label>' +
+    '<button class="button button--soft button--full" type="submit" hidden>Reintentar envío</button></form>' +
+    '<div class="payment-modal__actions"><button class="button button--ghost" type="button" data-transfer-close>Volver después</button>' +
+    '<button class="button button--soft" type="button" data-transfer-check hidden>Consultar estado</button>' +
+    '<button class="button button--primary" type="button" data-transfer-finish hidden>Ver mi cuenta</button></div></div>' +
+    '<section class="transfer-success" hidden aria-labelledby="transferSuccessTitle">' +
+    '<div class="transfer-success__seal" aria-hidden="true"><span></span><svg viewBox="0 0 32 32"><path d="m9 16 5 5 10-11"/></svg></div>' +
+    '<p class="kicker">Pago confirmado</p><h2 id="transferSuccessTitle">¡Pago exitoso!</h2><p class="transfer-success__intro">Tus meses seleccionados ya están pagados.</p>' +
+    '<div class="transfer-success__receipt"><span>Total pagado</span><strong data-success-amount></strong><div class="transfer-success__months"></div>' +
+    '<div class="transfer-success__meta"><span data-success-contract></span><span data-success-reference></span></div></div>' +
+    '<button class="button button--primary button--full" type="button" data-transfer-finish>Volver a mi cuenta <span aria-hidden="true">→</span></button>' +
+    (Backend.isTransferSimulation ? '<span class="transfer-success__test">Modo prueba</span>' : '') + '</section></div>';
   document.body.appendChild(dialog);
   dialog.showModal();
   const feedback = dialog.querySelector('.transfer-feedback');
@@ -79,7 +84,9 @@ export async function openTransferPayment(contractId, ledgerIds, onSuccess, resu
   const receiptForm = dialog.querySelector('.transfer-receipt-form');
   const checkButton = dialog.querySelector('[data-transfer-check]');
   const finishButton = dialog.querySelector('[data-transfer-finish]');
-  const simulation = dialog.querySelector('.transfer-simulation');
+  const main = dialog.querySelector('.transfer-main');
+  const success = dialog.querySelector('.transfer-success');
+  let confettiTimer = null;
   let order = null, accessToken = saved && saved.accessToken, poller = null;
   let creating = false, uploading = false, checking = false, notifiedSuccess = false;
   const selectionKey = 'vitrinazo-transfer-request-' + namespace + ':' + JSON.stringify([contractId, ledgerIds.slice().sort()]);
@@ -93,12 +100,13 @@ export async function openTransferPayment(contractId, ledgerIds, onSuccess, resu
         ? 'El pago por transferencia todavía no está disponible en este sitio.'
         : error.message || 'No fue posible consultar tu transferencia. Reintentaremos automáticamente.';
       feedback.classList.add('is-error');
+      feedback.hidden = false;
     }
   }
   function renderSummary(months, amountInCents, reference) {
-    summary.innerHTML = '<div class="payment-summary"><span>Total exacto a transferir</span><strong>' + escapeHtml(formatMoney(amountInCents / 100)) +
-      '</strong><p>' + months.map(month => escapeHtml(month.period)).join(' · ') + '</p>' +
-      (reference ? '<small>Referencia: ' + escapeHtml(reference) + '</small>' : '') + '</div>';
+    summary.innerHTML = '<div class="payment-summary"><span>Total del pago</span><strong>' + escapeHtml(formatMoney(amountInCents / 100)) +
+      '</strong><div class="payment-summary__months">' + months.map(month => '<span class="payment-month-chip">' + escapeHtml(month.period) + '</span>').join('') + '</div>' +
+      (reference ? '<small title="' + escapeHtml(reference) + '">Referencia · ' + escapeHtml(reference) + '</small>' : '') + '</div>';
   }
   function render(result) {
     const changedStatus = !order || order.status !== result.status;
@@ -108,35 +116,54 @@ export async function openTransferPayment(contractId, ledgerIds, onSuccess, resu
     const pending = !waiting && !terminalStates.includes(result.status);
     receiptForm.hidden = !waiting;
     accountForm.hidden = true;
-    checkButton.hidden = !pending;
+    checkButton.hidden = !pending || Backend.isTransferSimulation;
     finishButton.hidden = !terminalStates.includes(result.status);
     progress.hidden = !pending;
     dialog.setAttribute('aria-busy', String(pending));
     dialog.classList.toggle('transfer-modal--success', approved);
-    if (simulation) simulation.hidden = result.status !== 'PENDIENTE_VERIFICACION';
+    main.hidden = approved;
+    success.hidden = !approved;
+    dialog.setAttribute('aria-labelledby', approved ? 'transferSuccessTitle' : 'transferTitle');
+    feedback.hidden = pending;
+    const step = waiting ? 2 : 3;
+    dialog.querySelectorAll('[data-step]').forEach(item => {
+      item.classList.toggle('is-current', Number(item.dataset.step) === step);
+      item.classList.toggle('is-complete', Number(item.dataset.step) < step);
+    });
     renderSummary(result.months, result.amountInCents, result.reference);
     const account = result.account;
-    details.innerHTML = '<details class="transfer-bank-collapsible"' + (waiting ? ' open' : '') + '><summary>Datos bancarios de esta solicitud</summary><dl class="transfer-bank-details">' +
+    details.hidden = !waiting;
+    const copyIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="3"/><path d="M15 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h3"/></svg>';
+    details.innerHTML = '<dl class="transfer-bank-details">' +
       [['Banco', account.bankName], ['Titular', account.holderName], ['Documento', account.holderDocument],
         ['Tipo de cuenta', account.accountType], ['Número de cuenta', account.accountNumber], ['Valor a transferir', String(result.amountInCents / 100)]]
       .map(pair => '<div><dt>' + pair[0] + '</dt><dd><span>' + escapeHtml(pair[1]) + '</span>' +
-        '<button class="transfer-copy" type="button" data-copy="' + escapeHtml(pair[1]) + '" aria-label="Copiar ' + pair[0].toLowerCase() + '">Copiar</button></dd></div>').join('') + '</dl></details>';
+        '<button class="transfer-copy" type="button" data-copy="' + escapeHtml(pair[1]) + '" aria-label="Copiar ' + pair[0].toLowerCase() + '">' + copyIcon + '</button></dd></div>').join('') + '</dl>';
     const messages = {
-      ESPERANDO_COMPROBANTE: 'Copia los datos y realiza el pago por el valor exacto desde tu banco. Luego vuelve a esta misma pantalla y adjunta el pantallazo. Puedes cambiar de aplicación: tu solicitud queda guardada. Si ya transferiste, no vuelvas a pagar.',
-      PENDIENTE_VERIFICACION: 'Comprobante recibido. Forttu está verificando el pago. Permanece en esta sección: mostraremos la confirmación automáticamente. Los meses se actualizarán cuando se confirme el monto exacto. No vuelvas a transferir.',
-      VERIFICADO: 'Forttu confirmó la transferencia. Estamos actualizando los meses que seleccionaste.',
-      APLICANDO: 'Estamos actualizando tus meses. La confirmación aparecerá aquí al terminar.',
-      EN_REVISION: 'No se pudo aplicar el pago automáticamente porque el monto u otros datos no coinciden con tu solicitud. Tus meses no se confirman como pagados. Conserva esta referencia y comunícate con la inmobiliaria. No repitas la transferencia.',
-      RECHAZADO: 'Forttu no pudo verificar el pago con este comprobante. Los meses no se marcaron como pagados. Conserva tu referencia y comunícate con la inmobiliaria antes de volver a pagar.',
-      APROBADO: 'Forttu confirmó el monto exacto y los meses seleccionados ya quedaron pagados. Tu estado de cuenta se ha actualizado.'
+      ESPERANDO_COMPROBANTE: 'Transfiere el valor exacto y vuelve aquí con tu comprobante.',
+      PENDIENTE_VERIFICACION: 'Verificando tu pago…',
+      VERIFICADO: 'Actualizando tus meses…',
+      APLICANDO: 'Actualizando tus meses…',
+      EN_REVISION: 'Los datos no coinciden. Conserva tu referencia y contacta a la inmobiliaria antes de volver a pagar.',
+      RECHAZADO: 'No pudimos verificar el comprobante. Contacta a la inmobiliaria antes de volver a pagar.',
+      APROBADO: 'Los meses seleccionados ya están pagados.'
     };
     feedback.classList.remove('is-error');
     feedback.textContent = messages[result.status] || 'Tu transferencia está en revisión.';
-    dialog.querySelector('h2').textContent = approved ? 'Pago realizado exitosamente' : waiting ? 'Realiza el pago y vuelve aquí' : 'Verificación de tu pago';
+    dialog.querySelector('#transferTitle').textContent = waiting ? 'Transfiere y adjunta' : pending ? 'Ya casi está' : 'Revisemos tu pago';
+    if (approved) {
+      success.querySelector('[data-success-amount]').textContent = formatMoney(result.amountInCents / 100);
+      success.querySelector('.transfer-success__months').innerHTML = result.months.map(month => '<span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg>' + escapeHtml(month.period) + '</span>').join('');
+      success.querySelector('[data-success-contract]').textContent = result.contractId;
+      const reference = success.querySelector('[data-success-reference]');
+      reference.textContent = 'Ref. ' + result.reference.slice(-8).toUpperCase();
+      reference.title = result.reference;
+    }
     if (changedStatus) dialog.querySelector('.modal__surface').scrollTop = 0;
     if (approved && !notifiedSuccess) {
       notifiedSuccess = true;
       forget();
+      celebrate();
       Promise.resolve(onSuccess()).catch(() => showToast('Pago confirmado. Vuelve a consultar tu estado de cuenta para actualizarlo.', 'error'));
     } else if (terminalStates.includes(result.status)) {
       try { sessionStorage.removeItem(activeKey); } catch (error) { /* almacenamiento opcional */ }
@@ -150,22 +177,32 @@ export async function openTransferPayment(contractId, ledgerIds, onSuccess, resu
     const originalSelectionKey = order ? 'vitrinazo-transfer-request-' + namespace + ':' + JSON.stringify([contractId, order.months.map(month => month.id).sort()]) : selectionKey;
     try { localStorage.setItem(storageKey, JSON.stringify(orders)); sessionStorage.removeItem(activeKey); sessionStorage.removeItem(selectionKey); sessionStorage.removeItem(originalSelectionKey); } catch (error) { /* almacenamiento opcional */ }
   }
-  function setSimulationBusy(busy) {
-    if (simulation) simulation.querySelectorAll('button').forEach(button => { button.disabled = busy; });
+  function celebrate() {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const container = dialog.querySelector('.transfer-confetti');
+    const colors = ['#31b9ed', '#bda574', '#238c76', '#a1d9e8', '#e7c78c'];
+    const fragment = document.createDocumentFragment();
+    for (let index = 0; index < 52; index += 1) {
+      const piece = document.createElement('i');
+      piece.style.cssText = 'left:' + Math.random() * 100 + '%;background:' + colors[index % colors.length] + ';' +
+        '--drift:' + (Math.random() * 240 - 120) + 'px;--fall:' + (dialog.clientHeight + 100) + 'px;' +
+        '--spin:' + (Math.random() * 1000 - 500) + 'deg;--delay:' + Math.random() * 400 + 'ms;';
+      fragment.appendChild(piece);
+    }
+    container.appendChild(fragment);
+    confettiTimer = setTimeout(() => container.replaceChildren(), 4200);
   }
   async function check() {
     clearTimeout(poller);
     if (!dialog.open || !order || checking || uploading) return;
     checking = true;
-    setSimulationBusy(true);
     try {
       const result = await Backend.call('refreshTransferOrder', order.reference, accessToken);
       if (dialog.open) render(result);
     } catch (error) { fail(error); }
     finally {
       checking = false;
-      setSimulationBusy(false);
-      if (dialog.open && order && !terminalStates.includes(order.status) && order.status !== 'ESPERANDO_COMPROBANTE') poller = setTimeout(check, document.hidden ? 30000 : 10000);
+      if (dialog.open && order && !terminalStates.includes(order.status) && order.status !== 'ESPERANDO_COMPROBANTE') poller = setTimeout(check, document.hidden ? 30000 : Backend.isTransferSimulation ? 500 : 10000);
     }
   }
   function resumeCheck() { if (!document.hidden) check(); }
@@ -173,9 +210,10 @@ export async function openTransferPayment(contractId, ledgerIds, onSuccess, resu
   window.addEventListener('focus', resumeCheck);
   window.addEventListener('pageshow', resumeCheck);
   dialog.querySelectorAll('[data-transfer-close]').forEach(button => button.addEventListener('click', () => dialog.close()));
-  finishButton.addEventListener('click', () => dialog.close());
+  dialog.querySelectorAll('[data-transfer-finish]').forEach(button => button.addEventListener('click', () => dialog.close()));
   dialog.addEventListener('close', function () {
     clearTimeout(poller);
+    clearTimeout(confettiTimer);
     document.removeEventListener('visibilitychange', resumeCheck);
     window.removeEventListener('focus', resumeCheck);
     window.removeEventListener('pageshow', resumeCheck);
@@ -187,8 +225,9 @@ export async function openTransferPayment(contractId, ledgerIds, onSuccess, resu
     if (!button) return;
     try {
       await navigator.clipboard.writeText(button.dataset.copy);
-      button.textContent = 'Copiado';
-      setTimeout(() => { button.textContent = 'Copiar'; }, 1800);
+      const original = button.innerHTML;
+      button.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg>';
+      setTimeout(() => { button.innerHTML = original; }, 1800);
     } catch (error) { showToast('Selecciona el dato y cópialo desde el menú de tu dispositivo.', 'error'); }
   });
   checkButton.addEventListener('click', async function () {
@@ -216,10 +255,14 @@ export async function openTransferPayment(contractId, ledgerIds, onSuccess, resu
     event.preventDefault();
     if (uploading || !order) return;
     const button = receiptForm.querySelector('button');
+    const fileInput = receiptForm.elements.receipt;
     let submitted = false;
     uploading = true;
+    fileInput.disabled = true;
+    button.hidden = true;
     setBusy(button, true, 'Enviando comprobante');
-    feedback.textContent = 'Enviando tu comprobante. Espera en esta sección…';
+    feedback.textContent = 'Enviando tu comprobante…';
+    feedback.classList.remove('is-error');
     try {
       const file = receiptForm.elements.receipt.files[0];
       if (!file || !file.size || file.size > 4 * 1024 * 1024 || !['application/pdf', 'image/jpeg', 'image/png'].includes(file.type)) throw new Error('Selecciona un PDF, JPG o PNG de máximo 4 MB.');
@@ -232,18 +275,28 @@ export async function openTransferPayment(contractId, ledgerIds, onSuccess, resu
       const result = await Backend.call('submitTransferReceipt', order.reference, accessToken, { mimeType: file.type, base64 });
       submitted = true;
       if (dialog.open) { receiptForm.reset(); render(result); }
-    } catch (error) { fail(error); }
-    finally { uploading = false; setBusy(button, false); }
+    } catch (error) { fail(error); button.hidden = false; }
+    finally { uploading = false; fileInput.disabled = false; setBusy(button, false); }
     if (submitted) await check();
   });
-  if (simulation) simulation.addEventListener('click', async function (event) {
-    const button = event.target.closest('[data-simulate]');
-    if (!button || checking) return;
-    checking = true;
-    setSimulationBusy(true);
-    try { render(await Backend.call('simulateTransferVerification', order.reference, accessToken, button.dataset.simulate)); }
-    catch (error) { fail(error); }
-    finally { checking = false; setSimulationBusy(false); }
+  const fileInput = receiptForm.elements.receipt;
+  const dropzone = dialog.querySelector('.transfer-dropzone');
+  fileInput.addEventListener('change', function () {
+    if (!fileInput.files.length || uploading) return;
+    dialog.querySelector('[data-receipt-label]').textContent = fileInput.files[0].name;
+    receiptForm.requestSubmit();
+  });
+  ['dragenter', 'dragover'].forEach(name => dropzone.addEventListener(name, function (event) {
+    event.preventDefault();
+    if (!uploading) dropzone.classList.add('is-dragging');
+  }));
+  ['dragleave', 'drop'].forEach(name => dropzone.addEventListener(name, function (event) {
+    event.preventDefault(); dropzone.classList.remove('is-dragging');
+  }));
+  dropzone.addEventListener('drop', function (event) {
+    if (uploading || !event.dataTransfer.files.length) return;
+    fileInput.files = event.dataTransfer.files;
+    fileInput.dispatchEvent(new Event('change', { bubbles: true }));
   });
   try {
     if (resume) {
@@ -259,7 +312,7 @@ export async function openTransferPayment(contractId, ledgerIds, onSuccess, resu
       if (!dialog.open) return;
       accountForm.elements.accountId.innerHTML = accounts.map(account => '<option value="' + escapeHtml(account.id) + '">' + escapeHtml(account.bankName + ' · ' + account.accountType + ' · ' + account.accountNumber) + '</option>').join('');
       if (selection.length) renderSummary(selection, selection.reduce((sum, month) => sum + month.amountInCents, 0));
-      feedback.textContent = 'Elige la cuenta donde deseas pagar. Al confirmar, guardaremos tu solicitud y mostraremos los datos para copiar, hacer la transferencia y volver a subir el comprobante.';
+      feedback.textContent = 'Selecciona dónde quieres realizar la transferencia.';
       accountForm.hidden = false;
     }
   } catch (error) { fail(error); }

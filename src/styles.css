@@ -547,37 +547,101 @@ tr.is-saving td small { color: #2387ad; }
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
 
+.payment-test-mode { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-top: 1.1rem; padding-top: .85rem; border-top: 1px solid var(--line); font-size: .72rem; }
+.payment-test-mode > span { display: flex; align-items: center; gap: .45rem; color: #678091; }
+.payment-test-mode i { width: 6px; height: 6px; border-radius: 50%; background: #b9a277; box-shadow: 0 0 0 3px #f5f0e6; }
+.payment-test-mode button { padding: .25rem 0; border: 0; color: #647b8a; background: none; font-size: .72rem; cursor: pointer; }
+.payment-test-mode button:hover { color: var(--ink); }
 .transfer-resume { margin-bottom: 1rem; }
-.transfer-feedback { padding: 1rem; margin: 1rem 0; border-radius: 12px; background: #eef5f7; color: #234657; line-height: 1.6; }
-.transfer-bank-details { display: grid; gap: .7rem; margin: 1.2rem 0; }
-.transfer-bank-details > div { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .3rem 1rem; padding-bottom: .7rem; border-bottom: 1px solid var(--line); }
-.transfer-bank-details dt { color: #637a87; }
-.transfer-bank-details dd { margin: 0; font-weight: 700; overflow-wrap: anywhere; }
+.transfer-modal { width: min(540px, calc(100% - 28px)); border-radius: 28px; }
+.transfer-modal .modal__surface { padding: 2rem; border: 1px solid rgba(255,255,255,.7); border-radius: 28px; background: #fdfefe; }
+.transfer-modal .modal__close { top: 1.2rem; right: 1.2rem; width: 32px; height: 32px; font-size: 1.4rem; }
+.transfer-heading { display: flex; align-items: center; gap: .7rem; padding-right: 2rem; margin-bottom: .9rem; }
+.transfer-brand-mark { display: grid; place-items: center; width: 36px; height: 36px; flex-shrink: 0; border: 1px solid #d9e7ed; border-radius: 11px; color: #264f64; background: linear-gradient(145deg,#f7fbfc,#eaf3f7); }
+.transfer-brand-mark svg { width: 20px; height: 20px; }
+.transfer-heading .kicker { margin: 0; color: #66808e; font-size: .61rem; letter-spacing: .14em; }
+.transfer-test-tag { margin-left: auto; padding: .25rem .5rem; border: 1px solid #e8e2d7; border-radius: 6px; color: #91815f; background: #faf8f3; font-size: .58rem; white-space: nowrap; }
+.transfer-modal h2 { padding-right: 0; font-size: 2.15rem; font-weight: 650; letter-spacing: -.055em; line-height: 1.15; }
+.transfer-steps { display: grid; grid-template-columns: repeat(3,1fr); gap: .6rem; list-style: none; padding: 0; margin: 1.4rem 0; }
+.transfer-steps li { display: flex; align-items: center; gap: .4rem; padding-bottom: .7rem; border-bottom: 2px solid #edf1f3; color: #a0adb5; font-size: .64rem; white-space: nowrap; }
+.transfer-steps li > span { font-size: .58rem; font-weight: 700; }
+.transfer-steps .is-current { border-color: #2d9ec5; color: #163e53; font-weight: 650; }
+.transfer-steps .is-complete { border-color: #b7d5df; color: #789ba9; }
+.transfer-selection .payment-summary { margin: 0; padding: 1.3rem 1.4rem; border: 1px solid #1c4357; border-radius: 19px; background: radial-gradient(ellipse at 100% 0, #234e62, transparent 75%), #092637; box-shadow: 0 8px 25px #0926370a; }
+.transfer-selection .payment-summary > span { color: #a6bdc7; font-size: .66rem; letter-spacing: .03em; }
+.transfer-selection .payment-summary > strong { margin-top: .3rem; font-size: 2.35rem; font-weight: 550; letter-spacing: -.055em; }
+.transfer-selection .payment-summary__months { gap: .4rem; margin-top: .85rem; padding-top: .8rem; }
+.transfer-selection .payment-month-chip { border-color: #ffffff1a; border-radius: 6px; padding: .25rem .5rem; color: #d7e9f0; background: #ffffff08; font-size: .62rem; font-weight: 500; }
+.transfer-selection .payment-summary small { display: block; margin: .75rem 0 0; overflow: hidden; color: #7f9ca9; text-align: left; font-size: .55rem; text-overflow: ellipsis; white-space: nowrap; }
+.transfer-feedback { margin: 1rem 0; color: #708390; font-size: .78rem; line-height: 1.55; }
+.transfer-feedback.is-error { padding: .8rem 1rem; border: 1px solid #f0d3d6; border-radius: 12px; color: #ad414b; background: #fff4f5; }
+.transfer-bank-details { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem 1.1rem; padding: 1.1rem; margin: 0 0 1rem; border: 1px solid #e3ebef; border-radius: 16px; background: #f7fafb; }
+.transfer-bank-details > div { min-width: 0; }
+.transfer-bank-details dt { margin-bottom: .2rem; color: #84949e; font-size: .59rem; }
+.transfer-bank-details dd { display: flex; align-items: center; justify-content: space-between; gap: .25rem; margin: 0; color: #254659; font-size: .71rem; font-weight: 600; overflow-wrap: anywhere; }
+.transfer-bank-details dd > span { min-width: 0; user-select: all; }
+.transfer-copy { display: grid; place-items: center; flex-shrink: 0; width: 25px; height: 26px; padding: 4px; border: 0; border-radius: 6px; color: #7f9aa8; background: transparent; cursor: pointer; }
+.transfer-copy svg { width: 14px; height: 14px; stroke-width: 1.6; }
+.transfer-copy:hover { color: #167ba2; background: #e4f0f5; }
 .transfer-modal form { display: grid; gap: 1rem; }
-.transfer-modal form label { min-width: 0; }
-.transfer-modal input, .transfer-modal select { width: 100%; min-width: 0; max-width: 100%; }
-.transfer-modal [hidden] { display: none; }
-.transfer-details .payment-summary small { overflow-wrap: anywhere; }
-.transfer-selection .payment-summary small { overflow-wrap: anywhere; color: #c6dce6; }
-.transfer-steps { display: flex; flex-wrap: wrap; gap: .45rem 1rem; list-style: none; padding: 0; color: var(--muted); font-size: .75rem; }
-.transfer-progress { display: flex; align-items: center; gap: .7rem; margin: 1rem 0; padding: 1rem; border-radius: 12px; color: #076a91; background: var(--sky-soft); }
-.transfer-feedback.is-error { color: #9e313a; background: #fff0f1; }
-.transfer-demo-notice, .transfer-simulation { padding: 1rem; border: 1px solid #f0d286; border-radius: 12px; background: #fff8e6; font-size: .8rem; }
-.transfer-simulation { margin: 1rem 0; }
-.transfer-simulation > div { display: flex; flex-wrap: wrap; gap: .5rem; }
-.transfer-simulation .button { min-height: 40px; font-size: .75rem; }
-.transfer-bank-details dd { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: .5rem; }
-.transfer-bank-details dd span { user-select: all; }
-.transfer-copy { padding: .3rem .55rem; border: 1px solid var(--line); border-radius: 7px; color: #076a91; background: #f1faff; font-size: .72rem; cursor: pointer; }
-.transfer-bank-collapsible { margin: 1rem 0; }
-.transfer-bank-collapsible summary { color: #076a91; font-size: .82rem; font-weight: 700; cursor: pointer; }
-.transfer-modal--success .transfer-feedback { color: #175b3f; background: #e8f8ee; }
-.transfer-modal--success h2 { color: #175b3f; }
-.transfer-modal .payment-modal__actions { display: flex; flex-wrap: wrap; }
-.transfer-modal .payment-modal__actions .button { flex: 1 1 150px; }
+.transfer-modal form label { min-width: 0; margin: 0; font-size: .74rem; color: #58717f; }
+.transfer-modal select { width: 100%; min-width: 0; max-width: 100%; margin-top: .45rem; border-radius: 12px; font-size: .87rem; }
+.transfer-modal .button--primary { min-height: 50px; border-radius: 13px; background: linear-gradient(110deg, #113a50, #205a70); box-shadow: 0 5px 12px #12394b12; font-size: .82rem; font-weight: 600; }
+.transfer-modal .button--primary:hover { background: linear-gradient(110deg, #174c65, #29738a); }
+.transfer-dropzone { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .2rem; min-height: 166px; padding: 1.1rem; overflow: hidden; border: 1.5px dashed #c5d6df; border-radius: 18px; text-align: center; background: linear-gradient(155deg,#f7fbfd,#fdfefe); transition: border-color .2s, background .2s, box-shadow .2s; }
+.transfer-dropzone:hover, .transfer-dropzone.is-dragging, .transfer-dropzone:focus-within { border-color: #469bbb; background: #edf7fb; box-shadow: inset 0 0 0 3px #ffffffb3; }
+.transfer-dropzone input { position: absolute; z-index: 2; inset: 0; width: 100%; height: 100%; padding: 0; opacity: 0; cursor: pointer; }
+.transfer-upload-icon { display: grid; place-items: center; width: 43px; height: 43px; margin-bottom: .55rem; border: 1px solid #d9e8ef; border-radius: 13px; color: #347b98; background: #edf5f9; }
+.transfer-upload-icon svg { width: 21px; height: 21px; }
+.transfer-dropzone > strong { max-width: 100%; overflow: hidden; color: #26495d; font-size: .86rem; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.transfer-dropzone > span:not(.transfer-upload-icon) { font-size: .73rem; color: #8b9da8; }
+.transfer-dropzone b { color: #367c99; font-weight: 550; }
+.transfer-dropzone small { margin: .5rem 0 0; color: #9cabb4; font-size: .59rem; }
+.transfer-dropzone:has(input:disabled) { opacity: .65; cursor: progress; }
+.transfer-progress { display: flex; align-items: center; gap: 1rem; padding: 1.6rem 1.25rem; margin-top: 1rem; border: 1px solid #e4edf1; border-radius: 18px; background: #f7fafc; }
+.transfer-progress strong { color: #2f5264; font-size: .92rem; font-weight: 600; }
+.transfer-progress strong > span { display: block; margin-top: .25rem; color: #93a3ad; font-size: .72rem; font-weight: 400; }
+.transfer-loader { width: 34px; height: 34px; flex-shrink: 0; border: 2px solid #dce9ef; border-top-color: #399ac0; border-right-color: #399ac0; border-radius: 50%; animation: paymentSpin .9s linear infinite; }
+.transfer-modal .payment-modal__actions { display: flex; justify-content: center; gap: .5rem; margin: 1.1rem 0 0; }
+.transfer-modal .payment-modal__actions .button { width: auto; min-height: 36px; padding: .4rem .8rem; border: 0; color: #8a9ca6; background: transparent; font-size: .7rem; box-shadow: none; }
+.transfer-success { position: relative; padding: 1.2rem 0 .3rem; text-align: center; animation: paymentReveal .45s ease both; }
+.transfer-success__seal { position: relative; display: grid; place-items: center; width: 106px; height: 106px; margin: .25rem auto 1.7rem; border: 1px solid #e4ede8; border-radius: 50%; background: #f6faf7; }
+.transfer-success__seal::before { content: ''; position: absolute; inset: 9px; border: 1px solid #d4e5dc; border-radius: 50%; }
+.transfer-success__seal > span { position: absolute; inset: 19px; border-radius: 50%; background: linear-gradient(140deg,#226e59,#2f947c); box-shadow: 0 8px 20px #246e5924; }
+.transfer-success__seal > svg { position: relative; z-index: 1; width: 44px; height: 44px; color: #fff; stroke-width: 1.8; animation: paymentReveal .7s .1s ease both; }
+.transfer-success > .kicker { margin-bottom: .5rem; color: #8f9b8f; font-size: .59rem; letter-spacing: .19em; }
+.transfer-success h2 { color: #173f35; font-size: 2.7rem; font-weight: 650; letter-spacing: -.065em; }
+.transfer-success__intro { margin: .65rem 0 1.7rem; color: #8b9c94; font-size: .79rem; }
+.transfer-success__receipt { padding: 1.5rem 1.2rem 1rem; margin-bottom: 1.5rem; border: 1px solid #e1eae5; border-radius: 18px; background: linear-gradient(145deg,#f7faf8,#fcfdfb); }
+.transfer-success__receipt > span { display: block; color: #8f9d94; font-size: .66rem; }
+.transfer-success__receipt > strong { display: block; margin: .2rem 0 1rem; color: #244e3e; font-size: 2.5rem; font-weight: 600; letter-spacing: -.055em; }
+.transfer-success__months { display: flex; justify-content: center; flex-wrap: wrap; gap: .4rem; }
+.transfer-success__months > span { display: flex; align-items: center; gap: .2rem; padding: .3rem .5rem; border: 1px solid #dce9df; border-radius: 7px; color: #5b7e69; background: #edf5ef; font-size: .62rem; }
+.transfer-success__months svg { width: 13px; height: 13px; }
+.transfer-success__meta { display: flex; justify-content: space-between; gap: .8rem; margin-top: 1.2rem; padding-top: .9rem; border-top: 1px dashed #dbe4de; text-align: left; font-size: .56rem; color: #9aaba0; }
+.transfer-success__meta > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.transfer-success__test { display: block; margin-top: .85rem; font-size: .55rem; letter-spacing: .08em; color: #b0b7ae; }
+.transfer-modal--success { width: min(480px, calc(100% - 28px)); }
+.transfer-modal--success .modal__surface { background: radial-gradient(ellipse at 50% 0,#f5faf6,transparent 60%),#fff; }
+.transfer-modal--success .button--primary { background: linear-gradient(110deg,#235c49,#357d61); }
+.transfer-confetti { position: absolute; z-index: 5; inset: 0; overflow: hidden; border-radius: inherit; pointer-events: none; }
+.transfer-confetti > i { position: absolute; top: -15px; display: block; width: 6px; height: 11px; border-radius: 1px; opacity: 0; animation: paymentConfetti 3s var(--delay) cubic-bezier(.15,.5,.7,1) both; }
+.transfer-confetti > i:nth-child(3n) { width: 5px; height: 5px; border-radius: 50%; }
+@keyframes paymentSpin { to { transform: rotate(360deg); } }
+@keyframes paymentReveal { from { opacity: 0; transform: translateY(9px) scale(.98); } to { opacity: 1; transform: none; } }
+@keyframes paymentConfetti { 0% { opacity: 0; transform: translate3d(0,-20px,0) rotate(0); } 10%,80% { opacity: 1; } 100% { opacity: 0; transform: translate3d(var(--drift),var(--fall),0) rotate(var(--spin)); } }
 @media (max-width: 480px) {
-  .transfer-modal .modal__surface { padding: 1.5rem 1rem; }
-  .transfer-modal h2 { padding-right: 2.2rem; font-size: 1.7rem; }
-  .transfer-bank-details > div { display: block; }
-  .transfer-bank-details dd { justify-content: flex-start; margin-top: .3rem; }
+  .transfer-modal .modal__surface { padding: 1.5rem; }
+  .transfer-heading { gap: .5rem; }
+  .transfer-heading .kicker { font-size: .54rem; }
+  .transfer-test-tag { font-size: .51rem; padding: .2rem .35rem; }
+  .transfer-modal h2 { font-size: 1.9rem; }
+  .transfer-steps { gap: .45rem; }
+  .transfer-steps li { font-size: .57rem; gap: .25rem; }
+  .transfer-selection .payment-summary { padding: 1.1rem; }
+  .transfer-selection .payment-summary > strong { font-size: 2rem; }
+  .transfer-bank-details { padding: .85rem; gap: .85rem .6rem; }
+  .transfer-bank-details dd { font-size: .64rem; }
+  .transfer-success h2 { font-size: 2.35rem; }
+  .transfer-success__receipt > strong { font-size: 2.15rem; }
 }

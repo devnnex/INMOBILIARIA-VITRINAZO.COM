@@ -9,7 +9,9 @@ const source = readFileSync(new URL('../src/common.js', import.meta.url), 'utf8'
 const receipt = { mimeType: 'application/pdf', base64: Buffer.from('%PDF-1.7\nDEMO ONLY').toString('base64') };
 
 function load(storage = new Map()) {
+  const now = Date.now();
   const context = vm.createContext({
+    Date: class extends Date { static now() { return now; } },
     window: { location: { search: '' } }, URLSearchParams,
     document: { querySelectorAll: () => [], querySelector: () => null },
     localStorage: { getItem: key => storage.get(key) ?? null, setItem: (key, value) => storage.set(key, value) },
@@ -47,9 +49,10 @@ const liveFixture = {
   ]
 };
 
-function loadWithBackend(storage = new Map(), { enabled = true, contract = structuredClone(liveFixture) } = {}) {
+function loadWithBackend(storage = new Map(), { enabled = true, contract = structuredClone(liveFixture), clock = { now: Date.now() } } = {}) {
   const requests = [];
   const context = vm.createContext({
+    Date: class extends Date { static now() { return clock.now; } },
     window: { location: { search: '' } }, URLSearchParams,
     document: { querySelectorAll: () => [], querySelector: () => null },
     localStorage: { getItem: key => storage.get(key) ?? null, setItem: (key, value) => storage.set(key, value) },
@@ -64,7 +67,7 @@ function loadWithBackend(storage = new Map(), { enabled = true, contract = struc
     }
   });
   vm.runInContext(enabled ? source : source.replace('const TRANSFER_SIMULATION_ENABLED = true;', 'const TRANSFER_SIMULATION_ENABLED = false;'), context);
-  return { call: (method, ...args) => context.api.call(method, ...args), api: context.api, storage, requests, contract };
+  return { call: (method, ...args) => context.api.call(method, ...args), api: context.api, storage, requests, contract, clock };
 }
 
 async function createLiveOrder(h, ids = ['MES-CUALQUIERA-1']) {
@@ -135,6 +138,31 @@ test('approving one contract cannot pay another contract even when monthly row i
   const otherOrder = await h.call('createTransferOrder', 'OTRO-CONTRATO', ['MES-CUALQUIERA-1'], 'DEMO-A', randomUUID());
   assert.equal(otherOrder.amountInCents, 170000000);
   assert.equal(otherOrder.success, false);
+});
+
+test('a valid upload is approved automatically after verification, survives reload and credits once without a confirmation click', async () => {
+  const h = loadWithBackend(); const order = await createLiveOrder(h);
+  await h.call('submitTransferReceipt', order.reference, order.accessToken, receipt);
+  assert.equal((await h.call('refreshTransferOrder', order.reference, order.accessToken)).status, 'PENDIENTE_VERIFICACION');
+  h.clock.now += 2500;
+  const resumed = loadWithBackend(h.storage, { clock: h.clock });
+  assert.equal((await resumed.call('refreshTransferOrder', order.reference, order.accessToken)).status, 'APROBADO');
+  assert.equal((await resumed.call('refreshTransferOrder', order.reference, order.accessToken)).success, true);
+  const result = (await resumed.call('lookupAccount', liveFixture.id)).contracts[0];
+  assert.equal(result.cartera[0].saldo, 0);
+  assert.equal(result.cartera[1].saldo, 3000000);
+  assert.equal(JSON.parse(h.storage.get('vitrinazo-transfer-simulation-v1')).payments.length, 1);
+  assert.ok(resumed.requests.every(request => request.action === 'lookupAccount'));
+});
+
+test('automatic verification still rejects changed amounts rather than celebrating a stale payment', async () => {
+  const h = loadWithBackend(); const order = await createLiveOrder(h);
+  await h.call('submitTransferReceipt', order.reference, order.accessToken, receipt);
+  h.contract.cartera[0].cargoExtra = 100;
+  await h.call('lookupAccount', liveFixture.id);
+  h.clock.now += 2500;
+  assert.equal((await h.call('refreshTransferOrder', order.reference, order.accessToken)).status, 'EN_REVISION');
+  assert.equal((await h.call('lookupAccount', liveFixture.id)).contracts[0].cartera[0].valorPagado, 250000);
 });
 
 test('demo approval pays only selected months once and survives a page reload', async () => {

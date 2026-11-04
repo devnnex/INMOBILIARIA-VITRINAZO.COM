@@ -212,8 +212,8 @@
       if (!database.contracts.some(item => item.id === contractId && item.estado === 'ACTIVO')) throw new Error('Contrato no disponible.');
       // Datos deliberadamente ficticios: no permiten realizar una transferencia.
       return [
-        { id: 'DEMO-A', bankName: 'Banco de prueba A', holderName: 'Inmobiliaria de demostración', holderDocument: 'NIT DE PRUEBA', accountType: 'Ahorros', accountNumber: 'CUENTA-DEMO-001' },
-        { id: 'DEMO-B', bankName: 'Banco de prueba B', holderName: 'Inmobiliaria de demostración', holderDocument: 'NIT DE PRUEBA', accountType: 'Corriente', accountNumber: 'CUENTA-DEMO-002' }
+        { id: 'DEMO-A', bankName: 'Banco A', holderName: 'Vitrinazo Inmobiliaria', holderDocument: 'NIT de prueba', accountType: 'Ahorros', accountNumber: 'CUENTA-DEMO-001' },
+        { id: 'DEMO-B', bankName: 'Banco B', holderName: 'Vitrinazo Inmobiliaria', holderDocument: 'NIT de prueba', accountType: 'Corriente', accountNumber: 'CUENTA-DEMO-002' }
       ];
     },
     createTransferOrder: function (contractId, ledgerIds, accountId, requestId) {
@@ -238,14 +238,22 @@
       if (!order) throw new Error('No fue posible acceder a esta solicitud.');
       return structuredClone(order);
     },
-    refreshTransferOrder: function (reference, accessToken) { return this.getTransferOrder(reference, accessToken); },
+    refreshTransferOrder: function (reference, accessToken) {
+      const order = this.getTransferOrder(reference, accessToken);
+      if (order.status === 'PENDIENTE_VERIFICACION' && Date.now() >= Number(order.verificationReadyAt || 0)) {
+        return this.simulateTransferVerification(reference, accessToken, 'APPROVED');
+      }
+      return order;
+    },
     submitTransferReceipt: function (reference, accessToken, receipt) {
       const order = this.getTransferOrder(reference, accessToken);
       if (order.receiptUploaded) return order;
       const bytes = atob(receipt.base64 || '');
       const signature = Array.from(bytes.slice(0, 8), value => value.charCodeAt(0)).join(',');
       if (!bytes.length || bytes.length > 4 * 1024 * 1024 || !(receipt.mimeType === 'application/pdf' && bytes.startsWith('%PDF-') || receipt.mimeType === 'image/jpeg' && signature.startsWith('255,216,255') || receipt.mimeType === 'image/png' && signature === '137,80,78,71,13,10,26,10')) throw new Error('Sube un PDF, JPG o PNG válido de máximo 4 MB.');
-      Object.assign(database.transfers.find(item => item.reference === reference), { receiptUploaded: true, status: 'PENDIENTE_VERIFICACION' });
+      Object.assign(database.transfers.find(item => item.reference === reference), {
+        receiptUploaded: true, status: 'PENDIENTE_VERIFICACION', verificationReadyAt: Date.now() + 2200
+      });
       persist();
       return this.getTransferOrder(reference, accessToken);
     },
